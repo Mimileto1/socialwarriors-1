@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
         <!-- Meta -->
         <meta charset="utf-8"/>
         <!-- Title and Icon -->
@@ -9,11 +10,12 @@
 	    <link rel="icon" type="image/gif" href="img/icon.png"/>
     </head>
     <body style="font-family: 'lucida grande',tahoma,verdana,arial,sans-serif">
+<form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf" value="{{ account_csrf() }}"><button type="submit">Cerrar sesión</button></form>
         <center>
             <!-- SESSION HEADER -->
             <div id="header" style="width: 760px; margin-top: 50px;">
                 <div id="session" style="float: right;">
-                    <p style="display:inline">Welcome <b>{{save_info.name}}</b>! Level {{save_info.level}} (<a href="/">Log Out</a>)</p>
+                    <p style="display:inline">Welcome <b>{{save_info.name}}</b>! Level {{save_info.level}}</p>
                 </div>
             </div>
             <br>

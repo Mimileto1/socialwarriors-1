@@ -8,10 +8,10 @@ import argparse
 
 # Parsed before anything heavy loads, so --help/bad args answer immediately
 _argparser = argparse.ArgumentParser(description="Social Wars Server")
-_argparser.add_argument("--host", "--ip", dest="host", default="127.0.0.1", help="Host/IP address to bind to (default: 127.0.0.1)")
-_argparser.add_argument("--port", dest="port", type=int, default=5055, help="Port to listen on (default: 5055)")
+_argparser.add_argument("--host", "--ip", dest="host", default="0.0.0.0" if os.environ.get("PORT") else "127.0.0.1", help="Host/IP address to bind to (default: 127.0.0.1)")
+_argparser.add_argument("--port", dest="port", type=int, default=int(os.environ.get("PORT", "5055")), help="Port to listen on (default: 5055)")
 _argparser.add_argument("--public-url", dest="public_url", default=None, help="URL the client reaches the server at, e.g. when behind a reverse proxy (default: http://<host>:<port>)")
-_args = _argparser.parse_args()
+_args = _argparser.parse_args() if __name__ == "__main__" else _argparser.parse_args([])
 
 if os.name == 'nt':
     os.system("color")
@@ -25,7 +25,7 @@ from get_game_config import get_game_config
 
 print (" [+] Loading players...")
 from get_player_info import get_player_info, get_neighbor_info
-from sessions import load_saves, load_static_villages, load_quests, all_saves_userid, all_saves_info, save_info, new_village, fb_friends_str
+from sessions import load_saves, load_static_villages, load_quests, all_saves_userid, save_info, new_village, fb_friends_str
 load_saves()
 print (" [+] Loading static villages...")
 load_static_villages()
@@ -37,17 +37,18 @@ load_quests()
 # auction_house = AuctionHouse()
 
 print (" [+] Loading server...")
-from flask import Flask, render_template, send_from_directory, request, redirect, session, send_file, jsonify
+from game_accounts import install_accounts
+from flask import Flask, abort, g, render_template, send_from_directory, request, redirect, send_file, jsonify
 from flask.debughelpers import attach_enctype_error_multidict
 from command import command
 from engine import timestamp_now
 from version import version_name
-from bundle import ASSETS_DIR, STUB_DIR, TEMPLATES_DIR, BASE_DIR
+from bundle import ASSETS_DIR, STUB_DIR, TEMPLATES_DIR, BASE_DIR, DATA_DIR
 from constants import Quests
 
 BIND_HOST = _args.host
 BIND_PORT = _args.port
-PUBLIC_URL = (_args.public_url or f"http://{BIND_HOST}:{BIND_PORT}").rstrip("/")
+PUBLIC_URL = (_args.public_url or "").rstrip("/")
 
 app = Flask(__name__, template_folder=TEMPLATES_DIR)
 
@@ -62,50 +63,51 @@ __DYNAMIC_ROOT = "/dynamic/menvswomen/srvsexwars"
 
 ## PAGES AND RESOURCES
 
-@app.route("/", methods=['GET', 'POST'])
-def login():
-    # Log out previous session
-    session.pop('USERID', default=None)
-    session.pop('GAMEVERSION', default=None)
-    # Reload saves (not static villages nor quests). Allows saves modification without server reset
-    load_saves()
-    # If logging in, set session USERID, and go to play
-    if request.method == 'POST':
-        session['USERID'] = request.form['USERID']
-        session['GAMEVERSION'] = request.form['GAMEVERSION']
-        print("[LOGIN] USERID:", request.form['USERID'])
-        print("[LOGIN] GAMEVERSION:", request.form['GAMEVERSION'])
-        return redirect("/play.html")
-    # Login page
-    if request.method == 'GET':
-        saves_info = all_saves_info()
-        return render_template("login.html", saves_info=saves_info, version=version_name)
+current_save, protect_payload, game_lock = install_accounts(
+    app, data_dir=DATA_DIR, slug="social-wars", title="Social Wars", theme="wars",
+    play="/play.html", create_save=lambda username: new_village(), save_exists=lambda value: value in all_saves_userid(),
+)
+
+
+@app.before_request
+def authorize_game_request():
+    if request.path.startswith("/dynamic/menvswomen/srvsexwars/"):
+        game_lock.acquire()
+        g.game_locked = True
+        save_id = protect_payload(request.values.get("USERID"))
+        if save_id not in all_saves_userid():
+            abort(503)
+
+
+@app.teardown_request
+def release_game_lock(error):
+    if g.pop("game_locked", False):
+        game_lock.release()
+
 
 @app.route("/play.html")
+@app.route("/ruffle.html")
 def play():
-    if 'USERID' not in session:
-        return redirect("/")
-    if 'GAMEVERSION' not in session:
-        return redirect("/")
+    user_id = current_save()
+    if user_id is None:
+        return redirect("/login")
+    with game_lock:
+        if user_id not in all_saves_userid():
+            abort(503, "La partida vinculada no está disponible.")
+        public_url = PUBLIC_URL or request.url_root.rstrip("/")
+        if not PUBLIC_URL and app.config["SESSION_COOKIE_SECURE"]:
+            public_url = public_url.replace("http://", "https://", 1)
+        return render_template(
+            "play.html", save_info=save_info(user_id), serverTime=timestamp_now(),
+            friendsInfo=fb_friends_str(user_id), version=version_name,
+            GAMEVERSION="Basesec_1.5.4.swf", public_url=public_url,
+        )
 
-    if session['USERID'] not in all_saves_userid():
-        return redirect("/")
-    
-    USERID = session['USERID']
-    GAMEVERSION = session['GAMEVERSION']
-    print("[PLAY] USERID:", USERID)
-    print("[PLAY] GAMEVERSION:", GAMEVERSION)
-    return render_template("play.html", save_info=save_info(USERID), serverTime=timestamp_now(), friendsInfo=fb_friends_str(USERID), version=version_name, GAMEVERSION=GAMEVERSION, public_url=PUBLIC_URL)
 
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "version": version_name})
 
-@app.route("/new.html")
-def new():
-    session['USERID'] = new_village()
-    session['GAMEVERSION'] = "Basesec_1.5.4.swf"
-    return redirect("play.html")
 
 @app.route("/crossdomain.xml")
 def crossdomain():
@@ -149,23 +151,23 @@ def track_game_status_response():
     installId = request.values['installId']
     user_id = request.values['user_id']
 
-    # print(f"track_game_status: status={status}, installId={installId}, user_id={user_id}. --", request.values)
+    # print(f"track_game_status: status={status}, installId={installId}, user_id={user_id}. --")
     print(f"[STATUS] USERID {user_id}: {status}")
     return ("", 200)
 
 @app.route(__DYNAMIC_ROOT + "/get_game_config.php")
 def get_game_config_response():
-    USERID = request.values['USERID']
+    USERID = current_save()
     user_key = request.values['user_key']
     language = request.values['language']
 
-    # print(f"get_game_config: USERID: {USERID}. --", request.values)
+    # print(f"get_game_config: USERID: {USERID}. --")
     print(f"[CONFIG] USERID {USERID}.")
     return get_game_config()
 
 @app.route(__DYNAMIC_ROOT + "/get_player_info.php", methods=['POST'])
 def get_player_info_response():
-    USERID = request.values['USERID']
+    USERID = current_save()
     user_key = request.values['user_key']
     language = request.values['language']
 
@@ -173,7 +175,7 @@ def get_player_info_response():
     client_id = int(request.values['client_id']) if 'client_id' in request.values else None
     map = int(request.values['map']) if 'map' in request.values else None
 
-    # print(f"get_player_info: USERID: {USERID}. --", request.values)
+    # print(f"get_player_info: USERID: {USERID}. --")
 
     # Current Player
     if user is None:
@@ -196,7 +198,7 @@ def get_player_info_response():
 
 # @app.route(__DYNAMIC_ROOT + "/bets/get_bets_list.php", methods=['POST'])
 # def get_bets_list():
-#     USERID = request.values['USERID']
+#     USERID = current_save()
 #     user_key = request.values['user_key']
 #     language = request.values['language']
 #     data = request.values['data']
@@ -227,7 +229,7 @@ def get_player_info_response():
 # 
 # @app.route(__DYNAMIC_ROOT + "/bets/get_bet_detail.php", methods=['POST'])
 # def get_bet_detail():
-#     USERID = request.values['USERID']
+#     USERID = current_save()
 #     user_key = request.values['user_key']
 #     language = request.values['language']
 #     data = request.values['data']
@@ -258,7 +260,7 @@ def get_player_info_response():
 # 
 # @app.route(__DYNAMIC_ROOT + "/bets/set_bet.php", methods=['POST'])
 # def set_bet():
-#     USERID = request.values['USERID']
+#     USERID = current_save()
 #     user_key = request.values['user_key']
 #     language = request.values['language']
 #     data = request.values['data']
@@ -289,11 +291,11 @@ def get_player_info_response():
 
 @app.route(__DYNAMIC_ROOT + "/sync_error_track.php", methods=['POST'])
 def sync_error_track_response():
-    USERID = request.values['USERID']
+    USERID = current_save()
     user_key = request.values['user_key']
     language = request.values['language']
 
-    # print(f"sync_error_track: USERID: {USERID}. --", request.values)
+    # print(f"sync_error_track: USERID: {USERID}. --")
     return ("", 200)
 
 @app.route("/null")
@@ -307,24 +309,27 @@ def flash_sync_error_response():
     elif sp_ref_cat == "flash_reload_attack":
         reason = "reload On End Attack"
 
-    print("flash_sync_error", reason, ". --", request.values)
+    print("flash_sync_error", reason, ". --")
     return redirect("/play.html")
 
 @app.route(__DYNAMIC_ROOT + "/command.php", methods=['POST'])
 def command_response():
-    USERID = request.values['USERID']
+    USERID = current_save()
     user_key = request.values['user_key']
     language = request.values['language']
 
-    # print(f"command: USERID: {USERID}. --", request.values)
+    # print(f"command: USERID: {USERID}. --")
 
-    data_str = request.values['data']
-    data_hash = data_str[:64]
-    assert data_str[64] == ';'
-    data_payload = data_str[65:]
-    data = json.loads(data_payload)
-
-    command(USERID, data)
+    data_str = request.values.get("data", "")
+    if len(data_str) < 66 or data_str[64] != ";":
+        abort(400)
+    try:
+        data = json.loads(data_str[65:])
+        if not isinstance(data, dict) or not isinstance(data.get("commands"), list):
+            abort(400)
+        command(USERID, data)
+    except (KeyError, ValueError, TypeError, IndexError):
+        abort(400)
     
     return ({"result": "success"}, 200)
 
@@ -332,7 +337,7 @@ def command_response():
 # I added this so the error message stops appearing
 @app.route(__DYNAMIC_ROOT + "/alliance/", methods=['POST'])
 def alliance():
-    USERID = request.values['USERID']
+    USERID = current_save()
     user_key = request.values['user_key']
     language = request.values['language']
     method = request.values['method']
@@ -348,5 +353,4 @@ def alliance():
 print (" [+] Running server...")
 
 if __name__ == '__main__':
-    app.secret_key = os.urandom(24)
     app.run(host=BIND_HOST, port=BIND_PORT, debug=False, threaded=True)

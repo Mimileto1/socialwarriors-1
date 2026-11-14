@@ -37,6 +37,6 @@ def get_neighbor_info(userid, map_number):
         "timestamp": timestamp_now(),
         "playerInfo": neighbor_session(userid)["playerInfo"],
         "map": neighbor_session(userid)["maps"][_map_number],
-        "privateState": neighbor_session(userid)["privateState"]
+        "privateState": {} if session(userid) is not None else neighbor_session(userid)["privateState"]
     }
     return neighbor_info

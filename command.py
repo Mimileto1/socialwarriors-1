@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 from sessions import session, save_session
 from get_game_config import get_name_from_item_id, get_attribute_from_item_id, get_attribute_from_goal_id, get_xp_from_level, get_weekly_reward_length, get_inventory_item_name, get_collection_name, get_collection_prize, get_premium_days
@@ -16,20 +17,28 @@ def command(USERID, data):
 
     # print(f"Number of commands to execute: {len(commands)}")
 
-    for i, comm in enumerate(commands):
-        map_id = comm[0]
-        cmd = comm[1]
-        args = comm[2]
-        resources_changed = comm[3]
+    village = session(USERID)
+    previous = deepcopy(village)
+    try:
+        for i, comm in enumerate(commands):
+            map_id = comm[0]
+            cmd = comm[1]
+            args = comm[2]
+            resources_changed = comm[3]
 
-        # print(f"map_id = {comm[0]}") # I think this is map ID, in SW this is always 0
-        # print(f"cmd = {comm[1]}")
-        # print(f"args = {comm[2]}")
-        # print(f"resources_changed = {comm[3]}") # So this seems to be resource modifications, because some commands don't send any args, like weekly_reward and set_variables
+            # print(f"map_id = {comm[0]}") # I think this is map ID, in SW this is always 0
+            # print(f"cmd = {comm[1]}")
+            # print(f"args = {comm[2]}")
+            # print(f"resources_changed = {comm[3]}") # So this seems to be resource modifications, because some commands don't send any args, like weekly_reward and set_variables
 
-        do_command(USERID, map_id, cmd, args, resources_changed)
+            do_command(USERID, map_id, cmd, args, resources_changed)
 
-    save_session(USERID) # Save session
+        save_session(USERID) # Save session
+    except Exception:
+        village.clear()
+        village.update(previous)
+        raise
+
 
 def do_command(USERID, map_id, cmd, args, resources_changed):
     save = session(USERID)
