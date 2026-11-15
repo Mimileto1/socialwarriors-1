@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invitación de vecino</title>
+<main><h1>Invitación de {{ inviter }}</h1>
+<p>Entra a tu partida o crea una cuenta para enviarle una solicitud de amistad.</p>
+<a href="/login">Entrar al juego</a> · <a href="/register">Crear cuenta</a>
+</main>
+<script>sessionStorage.setItem("community-inviter", {{ inviter | tojson }});</script>
+</html>

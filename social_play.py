@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict, deque
 from threading import Lock
 
-from flask import abort, jsonify, request
+from flask import abort, jsonify, render_template, request
 
 
 DDL = (
@@ -13,6 +13,12 @@ DDL = (
         body TEXT NOT NULL, created BIGINT NOT NULL
     )""",
     "CREATE INDEX IF NOT EXISTS chat_created ON chat_messages(created, id)",
+    """CREATE TABLE IF NOT EXISTS private_messages (
+        id TEXT PRIMARY KEY, first TEXT NOT NULL REFERENCES accounts(username),
+        second TEXT NOT NULL REFERENCES accounts(username),
+        author TEXT NOT NULL REFERENCES accounts(username), body TEXT NOT NULL, created BIGINT NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS private_chat_created ON private_messages(first, second, created, id)",
     """CREATE TABLE IF NOT EXISTS friendships (
         first TEXT NOT NULL REFERENCES accounts(username),
         second TEXT NOT NULL REFERENCES accounts(username),
@@ -67,6 +73,44 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
         with connect() as db:
             rows = db.execute(
                 "SELECT author, body, created FROM chat_messages ORDER BY created DESC, id DESC LIMIT 50"
+            ).fetchall()
+        return jsonify(messages=[dict(row) for row in reversed(rows)])
+
+    @app.get("/social/invitation")
+    def social_invitation():
+        return jsonify(path="/invite/" + identity())
+
+    @app.get("/invite/<username>")
+    def invitation_page(username):
+        if not username_pattern.fullmatch(username):
+            abort(404)
+        with connect() as db:
+            if not db.execute("SELECT 1 FROM accounts WHERE username=?", (username,)).fetchone():
+                abort(404)
+        return render_template("invitation.html", inviter=username)
+
+    @app.route("/social/private/<other>", methods=["GET", "POST"])
+    def social_private(other):
+        username = identity()
+        first, second = sorted((username, other))
+        with connect() as db:
+            if not db.execute(
+                "SELECT 1 FROM friendships WHERE first=? AND second=? AND accepted=1",
+                (first, second),
+            ).fetchone():
+                return jsonify(error="El chat privado requiere una amistad aceptada."), 403
+            if request.method == "POST":
+                verify_csrf()
+                limit(username)
+                message = request.form.get("message", "").strip()
+                if not 1 <= len(message) <= 300:
+                    return jsonify(error="Escribe un mensaje de 1 a 300 caracteres."), 400
+                db.execute("INSERT INTO private_messages VALUES (?, ?, ?, ?, ?, ?)",
+                           (uuid.uuid4().hex, first, second, username, message, time.time_ns() // 1_000_000))
+                return jsonify(ok=True), 201
+            rows = db.execute(
+                """SELECT author, body, created FROM private_messages WHERE first=? AND second=?
+                   ORDER BY created DESC, id DESC LIMIT 50""", (first, second)
             ).fetchall()
         return jsonify(messages=[dict(row) for row in reversed(rows)])
 

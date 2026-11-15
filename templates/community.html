@@ -1,22 +1,31 @@
 <aside class="game-community game-community-{{ community_theme }}" aria-label="Comunidad del juego">
-  <details open>
-    <summary>Chat en vivo</summary>
+  <nav aria-label="Paneles de comunidad">
+    <button type="button" data-panel="chat" aria-pressed="true">Chat</button>
+    <button type="button" data-panel="neighbors" aria-pressed="false">Vecinos</button>
+    <button type="button" data-panel="invite" aria-pressed="false">Invitaciones</button>
+  </nav>
+  <section data-view="chat" aria-label="Chat en vivo">
+    <p><strong id="community-room">Sala global</strong> <button type="button" id="community-global" hidden>Volver al chat global</button></p>
     <ol id="community-messages" aria-label="Mensajes del chat"></ol>
     <form id="community-chat">
       <label for="community-message">Mensaje</label>
       <input id="community-message" name="message" maxlength="300" required>
       <button>Enviar</button>
     </form>
-  </details>
-  <details open>
-    <summary>Amigos</summary>
+  </section>
+  <section data-view="neighbors" aria-label="Vecinos" hidden>
     <ul id="community-friends"></ul>
+  </section>
+  <section data-view="invite" aria-label="Invitaciones" hidden>
+    <label for="community-link">Tu enlace de invitación</label>
+    <input id="community-link" readonly>
+    <button type="button" id="community-copy">Copiar enlace</button>
     <form id="community-invite">
       <label for="community-user">Nombre de usuario</label>
       <input id="community-user" name="username" maxlength="32" required>
       <button>Solicitar amistad</button>
     </form>
-  </details>
+  </section>
   <p id="community-status" role="status"></p>
 </aside>
 <style>
@@ -25,7 +34,7 @@ font:15px system-ui,sans-serif;box-sizing:border-box;width:min(100%,760px);margi
 border:2px solid var(--accent);border-radius:8px;text-align:left}
 .game-community-empires{--panel:#f7ead1;--ink:#492b1d;--accent:#784323}
 .game-community-city{--panel:#e9f6fc;--ink:#14354c;--accent:#20688b}
-.game-community summary{font-weight:700;cursor:pointer;margin:8px 0}.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
+.game-community nav{display:flex;gap:8px;margin-bottom:12px}.game-community nav button[aria-pressed=false]{opacity:.72}.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
 .game-community ol{max-height:12rem;overflow:auto}.game-community li{margin:4px 0}
 .game-community form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
 .game-community input{min-width:8rem;flex:1}.game-community button{background:var(--accent);color:white;border:0;border-radius:4px;padding:6px 9px;cursor:pointer}
@@ -37,6 +46,13 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
   const messages = document.querySelector("#community-messages");
   const friends = document.querySelector("#community-friends");
   const status = document.querySelector("#community-status");
+  let peer = "";
+  const panel = messages.closest("aside");
+  const inviteForm = document.querySelector("#community-invite");
+  const link = document.querySelector("#community-link");
+  const room = document.querySelector("#community-room");
+  const globalButton = document.querySelector("#community-global");
+  const tabs = panel.querySelectorAll("[data-panel]");
   let lastChat = "";
   let lastFriends = "";
   let polling = false;
@@ -49,10 +65,41 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
       throw new Error("Inicia sesión de nuevo para usar la comunidad.");
     }
     if (response.status === 429) throw new Error("Espera unos segundos antes de volver a enviar.");
-    if (response.status === 403) throw new Error("Recarga la página y vuelve a intentar.");
+    if (response.status === 403 && !response.headers.get("Content-Type")?.includes("json")) throw new Error("Recarga la página y vuelve a intentar.");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "La comunidad no está disponible.");
     return data;
+  }
+  async function activate(view) {
+    for (const tab of tabs) tab.setAttribute("aria-pressed", String(tab.dataset.panel === view));
+    for (const section of panel.querySelectorAll("[data-view]")) section.hidden = section.dataset.view !== view;
+    if (view === "invite" && !link.value) {
+      try { link.value = new URL((await api("invitation")).path, location.origin).href; }
+      catch (error) { status.textContent = error.message; }
+    }
+  }
+  function chatPath() { return peer ? "private/" + encodeURIComponent(peer) : "chat"; }
+  function switchRoom(next) {
+    peer = next;
+    room.textContent = peer ? "Chat con " + peer : "Sala global";
+    globalButton.hidden = !peer;
+    messages.replaceChildren();
+    lastChat = "";
+    activate("chat");
+    refresh();
+  }
+  tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.panel)));
+  globalButton.addEventListener("click", () => switchRoom(""));
+  document.querySelector("#community-copy").addEventListener("click", async () => {
+    if (!link.value) return;
+    try { await navigator.clipboard.writeText(link.value); status.textContent = "Enlace copiado."; }
+    catch { link.select(); status.textContent = "Selecciona y copia el enlace."; }
+  });
+  const inviter = sessionStorage.getItem("community-inviter");
+  if (inviter) {
+    inviteForm.elements.username.value = inviter;
+    sessionStorage.removeItem("community-inviter");
+    activate("invite");
   }
   function renderChat(rows) {
     const signature = JSON.stringify(rows);
@@ -78,6 +125,12 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
       item.append(username + (state === "outgoing" ? " · Enviada " : state === "incoming" ? " · Recibida " : " "));
       const actions = state === "incoming" ? [["accept", "Aceptar"], ["remove", "Rechazar"]] :
         [["remove", state === "outgoing" ? "Cancelar" : "Eliminar"]];
+      if (state === "accepted") {
+        const chat = document.createElement("button");
+        chat.textContent = "Chat privado";
+        chat.addEventListener("click", () => switchRoom(username));
+        item.append(chat, " ");
+      }
       for (const [action, label] of actions) {
         const button = document.createElement("button");
         button.textContent = label;
@@ -91,8 +144,9 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
     if (polling || stopped || document.hidden) return;
     polling = true;
     try {
-      const [chat, list] = await Promise.all([api("chat"), api("friends")]);
-      renderChat(chat.messages);
+      const path = chatPath();
+      const [chat, list] = await Promise.all([api(path), api("friends")]);
+      if (path === chatPath()) renderChat(chat.messages);
       renderFriends(list.friends);
     } catch (error) {
       status.textContent = error.message;
@@ -112,7 +166,7 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
   }
   document.querySelector("#community-chat").addEventListener("submit", event => {
     event.preventDefault();
-    submit("chat", {message: event.currentTarget.elements.message.value}, event.currentTarget);
+    submit(chatPath(), {message: event.currentTarget.elements.message.value}, event.currentTarget);
   });
   document.querySelector("#community-invite").addEventListener("submit", event => {
     event.preventDefault();
