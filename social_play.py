@@ -76,6 +76,22 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
             ).fetchall()
         return jsonify(messages=[dict(row) for row in reversed(rows)])
 
+    @app.get("/social/players")
+    def social_players():
+        username = identity()
+        query = request.args.get("q", "").strip().lower()
+        if not 2 <= len(query) <= 32:
+            return jsonify(error="Escribe entre 2 y 32 caracteres para buscar."), 400
+        limit("players:" + username)
+        prefix = query.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+        with connect() as db:
+            rows = db.execute(
+                """SELECT username FROM accounts
+                   WHERE username LIKE ? ESCAPE '!' AND username <> ?
+                   ORDER BY username LIMIT 15""", (prefix, username)
+            ).fetchall()
+        return jsonify(players=[row["username"] for row in rows])
+
     @app.get("/social/invitation")
     def social_invitation():
         return jsonify(path="/invite/" + identity())

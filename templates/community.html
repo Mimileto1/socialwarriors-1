@@ -20,6 +20,12 @@
     <label for="community-link">Tu enlace de invitación</label>
     <input id="community-link" readonly>
     <button type="button" id="community-copy">Copiar enlace</button>
+    <form id="community-search">
+      <label for="community-query">Buscar jugador</label>
+      <input id="community-query" name="q" minlength="2" maxlength="32" required>
+      <button>Buscar</button>
+    </form>
+    <ul id="community-players" aria-label="Resultados de jugadores" aria-live="polite"></ul>
     <form id="community-invite">
       <label for="community-user">Nombre de usuario</label>
       <input id="community-user" name="username" maxlength="32" required>
@@ -167,6 +173,36 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
   document.querySelector("#community-chat").addEventListener("submit", event => {
     event.preventDefault();
     submit(chatPath(), {message: event.currentTarget.elements.message.value}, event.currentTarget);
+  });
+  document.querySelector("#community-search").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector("button");
+    const results = document.querySelector("#community-players");
+    button.disabled = true;
+    results.replaceChildren();
+    status.textContent = "";
+    try {
+      const query = encodeURIComponent(form.elements.q.value);
+      const {players} = await api("players?q=" + query);
+      if (!players.length) status.textContent = "No se encontraron jugadores.";
+      for (const username of players) {
+        const item = document.createElement("li");
+        const select = document.createElement("button");
+        select.type = "button";
+        select.textContent = "Seleccionar a " + username;
+        select.addEventListener("click", () => {
+          inviteForm.elements.username.value = username;
+          inviteForm.querySelector("button").focus();
+        });
+        item.append(select);
+        results.append(item);
+      }
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
   });
   document.querySelector("#community-invite").addEventListener("submit", event => {
     event.preventDefault();
