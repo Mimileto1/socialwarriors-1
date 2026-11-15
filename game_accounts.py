@@ -11,6 +11,7 @@ import time
 from threading import RLock
 
 import durable
+from social_play import install_social
 
 from flask import abort, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -92,18 +93,22 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
             return sha256(token.encode("ascii")).hexdigest()
         return None
 
-    def current_save():
+    def current_account():
         if "account" not in g:
             g.account = None
             key = token_hash()
             if key:
                 with connect() as db:
                     g.account = db.execute(
-                        "SELECT save_id FROM accounts JOIN sessions USING(username)"
+                        "SELECT accounts.username, save_id FROM accounts JOIN sessions USING(username)"
                         " WHERE token_hash=? AND expires>?",
                         (key, int(time.time())),
                     ).fetchone()
-        return g.account["save_id"] if g.account else None
+        return g.account
+
+    def current_save():
+        account = current_account()
+        return account["save_id"] if account else None
 
     def csrf_token():
         if "csrf" not in session:
@@ -163,11 +168,12 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
     def page(mode, error=None, status=200):
         return render_template("account.html", title=title, theme=theme, mode=mode, error=error), status
 
+    install_social(app, connect, current_account, verify_csrf, USERNAME, bool(durable.DATABASE_URL))
     app.jinja_env.globals["account_csrf"] = csrf_token
 
     @app.after_request
     def no_store(response):
-        if request.endpoint in {"account_login", "account_register", "account_logout", "play", "ruffle", "hello"} or current_save_cached():
+        if request.endpoint in {"account_login", "account_register", "account_logout", "play", "ruffle", "hello"} or request.path.startswith("/social/") or current_save_cached():
             response.headers["Cache-Control"] = "no-store"
         return response
 

@@ -1,0 +1,125 @@
+<aside class="game-community game-community-{{ community_theme }}" aria-label="Comunidad del juego">
+  <details open>
+    <summary>Chat en vivo</summary>
+    <ol id="community-messages" aria-label="Mensajes del chat"></ol>
+    <form id="community-chat">
+      <label for="community-message">Mensaje</label>
+      <input id="community-message" name="message" maxlength="300" required>
+      <button>Enviar</button>
+    </form>
+  </details>
+  <details open>
+    <summary>Amigos</summary>
+    <ul id="community-friends"></ul>
+    <form id="community-invite">
+      <label for="community-user">Nombre de usuario</label>
+      <input id="community-user" name="username" maxlength="32" required>
+      <button>Solicitar amistad</button>
+    </form>
+  </details>
+  <p id="community-status" role="status"></p>
+</aside>
+<style>
+.game-community{--panel:#f6f5ee;--ink:#19211b;--accent:#475630;color:var(--ink);background:var(--panel);
+font:15px system-ui,sans-serif;box-sizing:border-box;width:min(100%,760px);margin:16px auto;padding:12px 16px;
+border:2px solid var(--accent);border-radius:8px;text-align:left}
+.game-community-empires{--panel:#f7ead1;--ink:#492b1d;--accent:#784323}
+.game-community-city{--panel:#e9f6fc;--ink:#14354c;--accent:#20688b}
+.game-community summary{font-weight:700;cursor:pointer;margin:8px 0}.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
+.game-community ol{max-height:12rem;overflow:auto}.game-community li{margin:4px 0}
+.game-community form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
+.game-community input{min-width:8rem;flex:1}.game-community button{background:var(--accent);color:white;border:0;border-radius:4px;padding:6px 9px;cursor:pointer}
+#community-status:empty{display:none}
+</style>
+<script>
+(() => {
+  const token = {{ account_csrf() | tojson }};
+  const messages = document.querySelector("#community-messages");
+  const friends = document.querySelector("#community-friends");
+  const status = document.querySelector("#community-status");
+  let lastChat = "";
+  let lastFriends = "";
+  let polling = false;
+  let stopped = false;
+  async function api(path, fields) {
+    const options = fields ? {method: "POST", body: new URLSearchParams({...fields, csrf: token})} : {};
+    const response = await fetch("/social/" + path, options);
+    if (response.status === 401) {
+      stopped = true;
+      throw new Error("Inicia sesión de nuevo para usar la comunidad.");
+    }
+    if (response.status === 429) throw new Error("Espera unos segundos antes de volver a enviar.");
+    if (response.status === 403) throw new Error("Recarga la página y vuelve a intentar.");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "La comunidad no está disponible.");
+    return data;
+  }
+  function renderChat(rows) {
+    const signature = JSON.stringify(rows);
+    if (signature === lastChat) return;
+    lastChat = signature;
+    const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 30;
+    const oldTop = messages.scrollTop;
+    messages.replaceChildren(...rows.map(({author, body}) => {
+      const item = document.createElement("li");
+      const name = document.createElement("strong");
+      name.textContent = author + ": ";
+      item.append(name, body);
+      return item;
+    }));
+    messages.scrollTop = atEnd ? messages.scrollHeight : oldTop;
+  }
+  function renderFriends(rows) {
+    const signature = JSON.stringify(rows);
+    if (signature === lastFriends) return;
+    lastFriends = signature;
+    friends.replaceChildren(...rows.map(({username, status: state}) => {
+      const item = document.createElement("li");
+      item.append(username + (state === "outgoing" ? " · Enviada " : state === "incoming" ? " · Recibida " : " "));
+      const actions = state === "incoming" ? [["accept", "Aceptar"], ["remove", "Rechazar"]] :
+        [["remove", state === "outgoing" ? "Cancelar" : "Eliminar"]];
+      for (const [action, label] of actions) {
+        const button = document.createElement("button");
+        button.textContent = label;
+        button.addEventListener("click", () => submit("friends", {username, action}));
+        item.append(button, " ");
+      }
+      return item;
+    }));
+  }
+  async function refresh() {
+    if (polling || stopped || document.hidden) return;
+    polling = true;
+    try {
+      const [chat, list] = await Promise.all([api("chat"), api("friends")]);
+      renderChat(chat.messages);
+      renderFriends(list.friends);
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      polling = false;
+    }
+  }
+  async function submit(path, fields, form) {
+    try {
+      await api(path, fields);
+      if (form) form.reset();
+      status.textContent = "";
+      await refresh();
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  }
+  document.querySelector("#community-chat").addEventListener("submit", event => {
+    event.preventDefault();
+    submit("chat", {message: event.currentTarget.elements.message.value}, event.currentTarget);
+  });
+  document.querySelector("#community-invite").addEventListener("submit", event => {
+    event.preventDefault();
+    submit("friends", {action: "request", username: event.currentTarget.elements.username.value}, event.currentTarget);
+  });
+  document.addEventListener("visibilitychange", refresh);
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
