@@ -28,15 +28,16 @@ def get_neighbor_info(userid, map_number):
     if "playerInfo" not in _session or "maps" not in _session or "privateState" not in _session:
         print(f"USERID {userid} not found.")
         return ""
-    _map_number = map_number
-    if not map_number:
-        _map_number = 0
+    maps = _session["maps"]
+    _map_number = 0 if map_number is None else int(map_number)
+    if not 0 <= _map_number < len(maps):
+        return ""
     neighbor_info = {
         "result": "ok",
         "processed_errors": 0,
         "timestamp": timestamp_now(),
-        "playerInfo": neighbor_session(userid)["playerInfo"],
-        "map": neighbor_session(userid)["maps"][_map_number],
-        "privateState": {} if session(userid) is not None else neighbor_session(userid)["privateState"]
+        "playerInfo": _session["playerInfo"],
+        "map": maps[_map_number],
+        "privateState": {} if session(userid) is not None else _session["privateState"]
     }
     return neighbor_info

@@ -84,14 +84,14 @@ def remove_store_item(map: dict, item: int, quantity: int = 1):
             map["store"][itemstr] = new_quantity
 
 def bought_unit_add(save: dict, item: int):
-    boughtUnits = save["privateState"]["boughtUnits"]
-    if item not in boughtUnits:
-        boughtUnits.append(item)
+    bought_units = save["privateState"].setdefault("boughtUnits", [])
+    if not any(str(existing) == str(item) for existing in bought_units):
+        bought_units.append(int(item))
 
 def unit_collection_complete(save: dict, collection: int):
-    unitCollectionsCompleted = save["privateState"]["unitCollectionsCompleted"]
-    if collection not in unitCollectionsCompleted:
-        unitCollectionsCompleted.append(collection)
+    completed = save["privateState"].setdefault("unitCollectionsCompleted", [])
+    if not any(str(existing) == str(collection) for existing in completed):
+        completed.append(int(collection))
 
 def set_goals(privateState: dict, goal: int, progress: list):
     goals = privateState["goals"]
@@ -107,20 +107,23 @@ def inventory_set(privateState: dict, item: int, quantity: int):
         del privateState["inventoryItems"][itemstr]
 
 def inventory_add(privateState: dict, item: int, quantity: int):
+    quantity = max(0, int(quantity))
+    if quantity == 0:
+        return
+    inventory = privateState.setdefault("inventoryItems", {})
     itemstr = str(item)
-    if itemstr not in privateState["inventoryItems"]:
-        privateState["inventoryItems"][itemstr] = quantity
-    else:
-        privateState["inventoryItems"][itemstr] += quantity
+    inventory[itemstr] = int(inventory.get(itemstr, 0)) + quantity
 
 def inventory_remove(privateState: dict, item: int, quantity: int):
+    inventory = privateState.setdefault("inventoryItems", {})
     itemstr = str(item)
-    if itemstr in privateState["inventoryItems"]:
-        new_quantity = privateState["inventoryItems"][itemstr] - quantity
-        if new_quantity <= 0:
-            del privateState["inventoryItems"][itemstr]
-        else:
-            privateState["inventoryItems"][itemstr] = new_quantity
+    if itemstr not in inventory:
+        return
+    remaining = max(0, int(inventory[itemstr]) - max(0, int(quantity)))
+    if remaining == 0:
+        del inventory[itemstr]
+    else:
+        inventory[itemstr] = remaining
 
 def add_click(item: dict):
     attr = item[6]

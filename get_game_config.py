@@ -3,6 +3,7 @@ import os
 import jsonpatch
 import time
 import datetime
+import re
 
 from bundle import MODS_DIR, CONFIG_DIR, CONFIG_PATCH_DIR
 
@@ -86,6 +87,117 @@ modify_game_config()
 print (" [+] Cleaning config duplicates...")
 remove_duplicate_items()
 
+
+# Spanish text for the localized player-facing config values. Asset identifiers and
+# numeric/game-state fields are intentionally left untouched.
+_SPANISH_PHRASES = [
+    ("Rocket Fortress", "Fortaleza de cohetes"), ("Grape Field", "Campo de uvas"),
+    ("Corn Field", "Campo de maíz"), ("Field Hospital", "Hospital de campaña"),
+    ("Tank wheels", "Ruedas de tanque"), ("Rocket launcher", "Lanzacohetes"),
+    ("Stealth Fighter", "Caza furtivo"), ("Treasure Chest", "Cofre del tesoro"),
+    ("Lost Rocket", "Cohete perdido"), ("Destroyed Tank", "Tanque destruido"),
+    ("Dominion Tank", "Tanque del dominio"), ("Demolition Tank", "Tanque de demolición"),
+    ("Crusader Tank", "Tanque cruzado"), ("Missile Tank", "Tanque lanzamisiles"),
+    ("Red Mercury Dragon", "Dragón de mercurio rojo"), ("Forge Dragon", "Dragón de la forja"),
+    ("Viking Airship", "Dirigible vikingo"), ("Nebular Dragon Rider", "Jinete de dragón nebular"),
+    ("Nebular Dragon Knight", "Caballero dragón nebular"), ("Nebular Bicopter", "Bicóptero nebular"),
+    ("Andromeda Spaceship", "Nave espacial Andrómeda"), ("Elven Cruiser", "Crucero élfico"),
+    ("Space Elf", "Elfo espacial"), ("Elf Airship", "Dirigible élfico"),
+    ("Power Bot Chest", "Cofre de robot de poder"), ("Mecha Dragons Chest", "Cofre de dragones mecánicos"),
+    ("Chained", "Oferta"), ("Play Dragon City", "Juega a Dragon City"),
+    ("Command Center", "Centro de mando"), ("Helicopter Hangar", "Hangar de helicópteros"),
+    ("Bazooka Academy", "Academia de bazucas"), ("Tank Academy", "Academia de tanques"),
+    ("Wood Factory", "Fábrica de madera"), ("Oil Factory", "Fábrica de petróleo"),
+    ("Steel Factory", "Fábrica de acero"), ("Gold Factory", "Fábrica de oro"),
+    ("Jeep garage", "Garaje de jeeps"), ("Orc Headquarters", "Cuartel general orco"),
+    ("Limited Edition", "Edición limitada"), ("Exclusive", "Exclusivo"),
+    ("Aircrafts", "Aeronaves"), ("Aircraft", "Aeronave"),
+    ("Village", "Aldea"), ("Defense", "Defensa"), ("Army", "Ejército"),
+    ("Decorations", "Decoraciones"), ("Wonders", "Maravillas"),
+    ("Fortress", "Fortaleza"), ("Bunker", "Búnker"), ("Turret", "Torreta"),
+    ("Barracks", "Cuartel"), ("Academy", "Academia"), ("Hangar", "Hangar"),
+    ("Factory", "Fábrica"), ("Market", "Mercado"), ("Garage", "Garaje"),
+    ("Headquarters", "Cuartel general"), ("Soldiers", "Soldados"),
+    ("Soldier", "Soldado"), ("Vehicles", "Vehículos"), ("Vehicle", "Vehículo"),
+    ("Specials", "Especiales"), ("Special", "Especial"), ("Siege", "Asedio"),
+    ("Trees", "Árboles"), ("Tree", "Árbol"), ("Flowers", "Flores"),
+    ("Flower", "Flor"), ("Statues", "Estatuas"), ("Statue", "Estatua"),
+    ("House", "Casa"), ("Wall", "Muralla"), ("Silo", "Silo"),
+    ("Tank", "Tanque"), ("Field", "Campo"), ("Rocket", "Cohete"),
+    ("Fighter", "Caza"), ("Wheels", "Ruedas"), ("Launcher", "Lanzador"),
+    ("Grape", "Uva"), ("Corn", "Maíz"), ("Treasure", "Tesoro"),
+    ("Chest", "Cofre"), ("Lost", "Perdido"), ("Destroyed", "Destruido"),
+    ("Metallic", "Metálico"), ("Magic", "Mágico"), ("Black", "Negro"),
+    ("Electric", "Eléctrico"), ("Red", "Rojo"), ("Blue", "Azul"),
+    ("Bonus", "Bono"), ("Power", "Poder"), ("Advanced", "Avanzado"),
+    ("Professional", "Profesional"), ("Supreme", "Supremo"),
+    ("Ambush", "Emboscada"), ("Combat", "Combate"), ("Killer", "Destructor"),
+    ("Bot", "Robot"), ("Ship", "Barco"), ("Airship", "Dirigible"),
+    ("Viking", "Vikingo"), ("Rider", "Jinete"), ("Knight", "Caballero"),
+    ("Spaceship", "Nave espacial"), ("Space", "Espacial"),
+    ("Elven", "Élfico"), ("Elf", "Elfo"), ("Cruiser", "Crucero"),
+    ("Scouter", "Explorador"), ("Andromeda", "Andrómeda"),
+    ("Basic", "Básico"), ("Ork", "Orco"), ("Wood", "Madera"), ("Oil", "Petróleo"), ("Steel", "Acero"),
+    ("Gold", "Oro"), ("Coins", "Monedas"), ("Cash", "Efectivo"),
+    ("Warrior", "Guerrero"), ("Orc", "Orco"), ("Alien", "Alienígena"),
+    ("Gorilla", "Gorila"), ("Elephant", "Elefante"), ("Wild", "Salvaje"),
+    ("Small", "Pequeño"), ("Large", "Grande"), ("Big", "Grande"),
+    ("New", "Nuevo"), ("Level", "Nivel"), ("Upgrade", "Mejora"),
+    ("Build", "Construir"), ("Building", "Edificio"), ("Unit", "Unidad"),
+    ("Units", "Unidades"), ("Attack", "Ataque"), ("Defense", "Defensa"),
+    ("Health", "Salud"), ("Speed", "Velocidad"), ("Damage", "Daño"),
+    ("Mission", "Misión"), ("Missions", "Misiones"), ("Reward", "Recompensa"),
+    ("Complete", "Completar"), ("Collect", "Recolectar"), ("Collection", "Colección"),
+    ("Collections", "Colecciones"), ("Research", "Investigación"),
+    ("Energy", "Energía"), ("Time", "Tiempo"), ("Free", "Gratis"),
+    ("Friends", "Amigos"), ("Friend", "Amigo"), ("Help", "Ayuda"),
+    ("Yes", "Sí"), ("No", "No"), ("Cancel", "Cancelar"), ("Back", "Volver"),
+    ("Start", "Iniciar"), ("Continue", "Continuar"), ("Buy", "Comprar"),
+    ("Sell", "Vender"), ("Storage", "Almacén"), ("Warehouse", "Depósito"),
+    ("Harbour", "Puerto"), ("Port", "Puerto"), ("Farm", "Granja"),
+    ("Factory", "Fábrica"), ("War", "Guerra"), ("Battle", "Batalla"),
+    ("Complete your collection", "Completa tu colección"),
+    ("Collect your reward", "Recoge tu recompensa"),
+    ("Tap to collect", "Toca para recoger"), ("Tap to build", "Toca para construir"),
+    ("Resource storage", "Almacén de recursos"), ("Resource production", "Producción de recursos"),
+    ("Mission accomplished", "Misión cumplida"), ("Mission failed", "Misión fallida"),
+    ("Attack failed", "Ataque fallido"), ("Attack successful", "Ataque exitoso"),
+    ("Find an opponent", "Buscar rival"), ("Search opponent", "Buscar rival"),
+    ("Your opponent", "Tu rival"), ("Enemy village", "Aldea enemiga"),
+    ("Training time", "Tiempo de entrenamiento"), ("Build time", "Tiempo de construcción"),
+    ("Upgrade time", "Tiempo de mejora"), ("Not enough", "No tienes suficiente"),
+    ("Not enough resources", "No tienes recursos suficientes"),
+    ("Army capacity", "Capacidad del ejército"), ("Population limit", "Límite de población"),
+    ("Daily bonus", "Bono diario"), ("Weekly reward", "Recompensa semanal"),
+    ("Collection prize", "Premio de colección"), ("Unit collection", "Colección de unidades"),
+    ("Battle result", "Resultado del combate"), ("Victory", "Victoria"), ("Defeat", "Derrota"),
+    ("Loading", "Cargando"), ("Please wait", "Espera un momento"),
+    ("Select", "Seleccionar"), ("Close", "Cerrar"), ("Open", "Abrir"),
+    ("Upgrade building", "Mejorar edificio"), ("Train units", "Entrenar unidades"),
+    ("Send troops", "Enviar tropas"), ("Mission map", "Mapa de misión"),
+    ("Attack map", "Mapa de ataque"), ("Wood storage", "Almacén de madera"),
+    ("Oil storage", "Almacén de petróleo"), ("Steel storage", "Almacén de acero"),
+]
+_SPANISH_TEXT_KEYS = {"name", "title", "description", "hint", "text", "label", "message", "achievement_desc", "goalDescription"}
+
+def _translate_spanish_text(value):
+    for english, spanish in _SPANISH_PHRASES:
+        value = re.sub(r"(?<!\w)" + re.escape(english) + r"(?!\w)", spanish, value, flags=re.IGNORECASE)
+    return value
+
+def _localize_config_node(node):
+    if isinstance(node, dict):
+        for key, value in list(node.items()):
+            if key in _SPANISH_TEXT_KEYS and isinstance(value, str):
+                node[key] = _translate_spanish_text(value)
+            elif isinstance(value, (dict, list)):
+                _localize_config_node(value)
+    elif isinstance(node, list):
+        for value in node:
+            _localize_config_node(value)
+
+_localize_config_node(__game_config)
+
 def get_game_config() -> dict:
     make_dynamic(__game_config)
     return __game_config
@@ -106,7 +218,8 @@ def get_level_from_xp(xp: int) -> int:
         if lvl["exp_required"] > int(xp):
             return i
         i += 1
-    return 0
+    # Cap over-threshold XP at the final configured level instead of wrapping to 0.
+    return max(0, len(__game_config["levels"]) - 1)
 
 #########
 # ITEMS #

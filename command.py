@@ -511,25 +511,22 @@ def do_command(USERID, map_id, cmd, args, resources_changed):
         print(f"Removed {quantity} {name} from inventory")
 
     elif cmd == "complete_collection":
-        collection_id = args[0]
-        bought = args[1]
-
+        collection_id = int(args[0])
+        bought = bool(args[1])
         privateState = save["privateState"]
+        completed = privateState.setdefault("collections", [])
+        if any(str(value) == str(collection_id) for value in completed):
+            print(f"Collection {collection_id} was already claimed; ignored duplicate reward.")
+            return
 
-        prize = get_collection_prize(collection_id)
-
-        for key in prize:
-            add_store_item(map, int(key), prize[key])
-
+        prize = get_collection_prize(collection_id) if collection_id > 0 else None
+        if not prize:
+            raise ValueError("Invalid collection ID")
+        for key, quantity in prize.items():
+            add_store_item(map, int(key), int(quantity))
+        completed.append(collection_id)
         collection_name = get_collection_name(collection_id)
-
-        if collection_id not in privateState["collections"]:
-            privateState["collections"].append(collection_id)
-
-        if bought:
-            print(f"Bought {collection_name}")
-        else:
-            print(f"Completed {collection_name}")
+        print(f"{'Bought' if bought else 'Completed'} {collection_name}")
 
     elif cmd == "add_click":
         index = args[0]
