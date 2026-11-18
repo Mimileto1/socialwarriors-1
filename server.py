@@ -2,8 +2,6 @@ print (" [+] Loading basics...")
 import os
 import json
 import urllib
-import requests
-import io
 import argparse
 
 # Parsed before anything heavy loads, so --help/bad args answer immediately
@@ -38,11 +36,12 @@ load_quests()
 
 print (" [+] Loading server...")
 from game_accounts import install_accounts
-from flask import Flask, abort, g, render_template, send_from_directory, request, redirect, send_file, jsonify
+from flask import Flask, abort, g, render_template, send_from_directory, request, redirect, jsonify
 from flask.debughelpers import attach_enctype_error_multidict
 from command import command
 from engine import timestamp_now
 from version import version_name
+from asset_cdn import asset_redirect
 from bundle import ASSETS_DIR, STUB_DIR, TEMPLATES_DIR, BASE_DIR, DATA_DIR
 from constants import Quests
 
@@ -130,18 +129,8 @@ def css(path):
 
 @app.route(__STATIC_ROOT + "/<path:path>")
 def static_assets_loader(path):
-    # LITE-WEIGHT BUILD: ASSETS FROM GITHUB
-    if False:
-        cdn = "https://raw.githubusercontent.com/AcidCaos/socialwarriors/main/assets/"
-        try:
-            r = requests.get(cdn + path) # TODO timeout, retry
-        except requests.exceptions:
-            return ""
-        m = io.BytesIO(r.content)
-        m.seek(0)
-        return send_file(m, download_name=path.split("/")[-1:][0])
-    # OFFLINE BUILD
-    return send_from_directory(ASSETS_DIR, path)
+    cdn = asset_redirect(path)
+    return cdn if cdn is not None else send_from_directory(ASSETS_DIR, path, max_age=86400)
 
 ## GAME DYNAMIC
 
