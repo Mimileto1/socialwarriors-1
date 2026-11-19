@@ -4,6 +4,7 @@ import re
 import time
 import uuid
 
+from community_activities import install_activities
 from flask import abort, jsonify, redirect, render_template, request
 
 DDL = (
@@ -47,6 +48,8 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
         if not account:
             abort(401)
         return account["username"]
+
+    profile_title = install_activities(app, connect, username, is_admin, verify_csrf, persistent, limit)
 
     @app.route("/social/alliance", methods=["GET", "POST"])
     def social_alliance():
@@ -146,7 +149,8 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                 "SELECT a.name FROM alliances a JOIN alliance_members m ON m.alliance_id=a.id WHERE m.username=?",
                 (player,),
             ).fetchone()
-        return jsonify(username=player, neighbors=count, alliance=group["name"] if group else None)
+            title = profile_title(db, player)
+        return jsonify(username=player, neighbors=count, alliance=group["name"] if group else None, title=title)
 
     @app.route("/admin", methods=["GET", "POST"])
     def community_admin():

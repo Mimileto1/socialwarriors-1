@@ -8,7 +8,11 @@
         <title>Social Wars</title>
         <link rel="shortcut icon" href="img/icon.png"/>
 	    <link rel="icon" type="image/gif" href="img/icon.png"/>
-    </head>
+    <style>
+body{min-height:100vh;background:linear-gradient(180deg,#0b102e55,#090f1733 42%,#090b1359),url("/img/community-backdrop-v1.webp") center/cover fixed no-repeat #16201b}
+@media (max-width:720px){body{background-attachment:scroll}}
+</style>
+</head>
     <body style="font-family: 'lucida grande',tahoma,verdana,arial,sans-serif">
 <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf" value="{{ account_csrf() }}"><button type="submit">Cerrar sesión</button></form>
         <center>

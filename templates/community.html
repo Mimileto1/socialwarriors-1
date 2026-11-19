@@ -4,6 +4,9 @@
     <button type="button" data-panel="neighbors" aria-expanded="false"><span aria-hidden="true">♟</span>Vecinos</button>
     <button type="button" data-panel="invite" aria-expanded="false"><span aria-hidden="true">✉</span>Invitar</button>
     <button type="button" data-panel="alliance" aria-expanded="false"><span aria-hidden="true">⚑</span>Alianza</button>
+    <button type="button" data-panel="events" aria-expanded="false"><span aria-hidden="true">✦</span>Eventos</button>
+    <button type="button" data-panel="ranking" aria-expanded="false"><span aria-hidden="true">◆</span>Clasif.</button>
+    <button type="button" data-panel="rewards" aria-expanded="false"><span aria-hidden="true">✿</span>Bonos</button>
     <button type="button" data-panel="profile" aria-expanded="false"><span aria-hidden="true">◉</span>Perfil</button>
     {% if community_is_admin() %}<a href="/admin"><span aria-hidden="true">⚙</span>Admin</a>{% endif %}
   </nav>
@@ -47,6 +50,15 @@
     </form>
     <div id="alliance-details"></div>
   </section>
+  <section data-view="events" aria-label="Eventos" hidden><div id="community-events"></div></section>
+  <section data-view="ranking" aria-label="Clasificación" hidden><p>Puntos de comunidad ganados</p><ol id="community-rankings"></ol></section>
+  <section data-view="rewards" aria-label="Bonos y tienda" hidden>
+    <p id="community-points"></p><div id="community-bonuses"></div>
+    <form id="community-redeem"><label for="community-code">Código de recompensa</label>
+      <input id="community-code" maxlength="24" required><button>Canjear</button>
+    </form>
+    <h3>Títulos para tu perfil</h3><div id="community-shop"></div>
+  </section>
   <section data-view="profile" aria-label="Perfil" hidden><dl id="community-profile"></dl></section>
   <p id="community-status" role="status"></p>
   </div>
@@ -87,7 +99,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
   let activeView = "";
   const drawer = document.querySelector("#community-drawer");
   const heading = document.querySelector("#community-heading");
-  const views = {chat: "Chat", neighbors: "Vecinos", invite: "Invitaciones", alliance: "Alianza", profile: "Perfil"};
+  const views = {chat: "Chat", neighbors: "Vecinos", invite: "Invitaciones", alliance: "Alianza", events: "Eventos", ranking: "Clasificación", rewards: "Bonos y tienda", profile: "Perfil"};
   let activeButton;
   const panel = messages.closest("aside");
   const inviteForm = document.querySelector("#community-invite");
@@ -127,9 +139,12 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     }
     try {
       if (view === "alliance") await loadAlliance();
+      if (view === "events") await loadEvents();
+      if (view === "ranking") await loadRanking();
+      if (view === "rewards") await loadRewards();
       if (view === "profile") {
         const player = await api("profile");
-        const fields = [["Usuario", player.username], ["Vecinos", player.neighbors], ["Alianza", player.alliance || "Sin alianza"]];
+        const fields = [["Usuario", player.username], ["Título", player.title || "Sin título"], ["Vecinos", player.neighbors], ["Alianza", player.alliance || "Sin alianza"]];
         const profile = document.querySelector("#community-profile");
         profile.replaceChildren(...fields.flatMap(([label, value]) => {
           const title = document.createElement("dt"), detail = document.createElement("dd");
@@ -141,6 +156,104 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     } catch (error) { status.textContent = error.message; }
     refresh();
   }
+  let rankingEvent = "";
+  const dateLabel = new Intl.DateTimeFormat("es-CO", {dateStyle:"medium", timeStyle:"short", timeZone:"America/Bogota"});
+  function actionButton(label, action, disabled = false) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.disabled = disabled;
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try { await action(); } catch (error) { status.textContent = error.message; }
+      finally { button.disabled = disabled; }
+    });
+    return button;
+  }
+  function labeledRow(parent, text, ...buttons) {
+    const row = document.createElement("li");
+    row.append(text, " ", ...buttons);
+    parent.append(row);
+  }
+  async function reward(kind, reference, reload) {
+    await api("rewards", {kind, reference});
+    status.textContent = "Actualizado.";
+    await reload();
+  }
+  async function loadEvents() {
+    const state = await api("events");
+    if (activeView !== "events") return;
+    const list = document.createElement("ul");
+    for (const e of state.events) {
+      const entry = document.createElement("li");
+      const title = document.createElement("strong");
+      title.textContent = e.title;
+      const description = document.createElement("p");
+      description.textContent = e.description;
+      const open = !e.closed && e.starts <= state.now && e.ends > state.now;
+      const window = document.createElement("p");
+      window.textContent = e.closed ? "Cerrado" : dateLabel.format(new Date(e.starts * 1000)) + " – " + dateLabel.format(new Date(e.ends * 1000));
+      entry.append(title, description, window);
+      if (open || e.claimed) entry.append(actionButton(
+        e.claimed ? "Recompensa reclamada" : "Participar · " + e.points + " puntos",
+        () => reward("event", e.id, loadEvents), Boolean(e.claimed)
+      ));
+      entry.append(actionButton("Participantes", async () => {
+        rankingEvent = e.id;
+        await activate("ranking");
+      }));
+      list.append(entry);
+    }
+    if (!state.events.length) labeledRow(list, "Aún no hay eventos publicados.");
+    document.querySelector("#community-events").replaceChildren(list);
+  }
+  async function loadRanking() {
+    const event = rankingEvent;
+    const {players} = await api("rankings?event=" + encodeURIComponent(event));
+    if (activeView !== "ranking" || event !== rankingEvent) return;
+    const target = document.querySelector("#community-rankings");
+    target.replaceChildren();
+    players.forEach((p, index) => labeledRow(target, (index + 1) + ". " + p.username + " · " + p.score));
+    if (!players.length) labeledRow(target, "Todavía no hay puntos registrados.");
+    const title = target.previousElementSibling;
+    title.replaceChildren(event ? "Participantes del evento " : "Puntos de comunidad ganados");
+    if (event) title.append(actionButton("Ver clasificación general", async () => {
+      rankingEvent = "";
+      await loadRanking();
+    }));
+  }
+  async function loadRewards() {
+    const state = await api("rewards");
+    if (activeView !== "rewards") return;
+    document.querySelector("#community-points").textContent = "Saldo: " + state.points + " puntos de comunidad";
+    const bonuses = document.createElement("ul");
+    for (const b of state.bonuses) labeledRow(bonuses,
+      (b.kind === "daily" ? "Bono diario" : "Bono semanal") + " · " + b.points + " puntos",
+      actionButton(b.claimed ? "Reclamado" : "Reclamar", () => reward(b.kind, "", loadRewards), b.claimed)
+    );
+    document.querySelector("#community-bonuses").replaceChildren(bonuses);
+    const shop = document.createElement("ul");
+    for (const item of state.items) {
+      const equipped = state.equipped === item.id;
+      labeledRow(shop, item.title + (item.owned ? "" : " · " + item.cost + " puntos"),
+        item.owned
+          ? actionButton(equipped ? "Quitar título" : "Equipar", () => reward("equip", equipped ? "" : item.id, loadRewards))
+          : actionButton("Comprar", () => reward("shop", item.id, loadRewards), state.points < item.cost)
+      );
+    }
+    document.querySelector("#community-shop").replaceChildren(shop);
+  }
+  document.querySelector("#community-redeem").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const code = document.querySelector("#community-code");
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try { await reward("code", code.value.trim(), loadRewards); form.reset(); }
+    catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+
   function chatPath() { return peer ? "private/" + encodeURIComponent(peer) : "chat"; }
   function switchRoom(next) {
     peer = next;
