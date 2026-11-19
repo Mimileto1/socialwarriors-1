@@ -48,6 +48,10 @@
     <form id="alliance-search"><label for="alliance-query">Buscar alianza</label>
       <input id="alliance-query" name="q" maxlength="36"><button>Buscar</button>
     </form>
+    <form id="alliance-invite" hidden><label for="alliance-player">Invitar por nombre de usuario</label>
+      <input id="alliance-player" name="username" minlength="3" maxlength="32" required>
+      <button>Enviar invitación</button>
+    </form>
     <div id="alliance-details"></div>
   </section>
   <section data-view="events" aria-label="Eventos" hidden><div id="community-events"></div></section>
@@ -96,6 +100,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
   const friends = document.querySelector("#community-friends");
   const status = document.querySelector("#community-status");
   let peer = "";
+  let inAllianceChat = false;
   let activeView = "";
   const drawer = document.querySelector("#community-drawer");
   const heading = document.querySelector("#community-heading");
@@ -254,11 +259,15 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     finally { button.disabled = false; }
   });
 
-  function chatPath() { return peer ? "private/" + encodeURIComponent(peer) : "chat"; }
-  function switchRoom(next) {
-    peer = next;
-    room.textContent = peer ? "Chat con " + peer : "Sala global";
-    globalButton.hidden = !peer;
+  function chatPath() {
+    if (inAllianceChat) return "alliance/chat";
+    return peer ? "private/" + encodeURIComponent(peer) : "chat";
+  }
+  function switchRoom(next, alliance = false) {
+    peer = alliance ? "" : next;
+    inAllianceChat = alliance;
+    room.textContent = alliance ? "Alianza · " + next : peer ? "Chat con " + peer : "Sala global";
+    globalButton.hidden = !peer && !alliance;
     messages.replaceChildren();
     lastChat = "";
     activate("chat");
@@ -279,12 +288,20 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
 
   const allianceCreate = document.querySelector("#alliance-create");
   const allianceSearch = document.querySelector("#alliance-search");
+  const allianceInvite = document.querySelector("#alliance-invite");
   const allianceDetails = document.querySelector("#alliance-details");
   let allianceQuery = "";
   async function allianceAction(action, fields = {}) {
     try {
       await api("alliance", {action, ...fields});
       status.textContent = "";
+      if (action === "leave" && inAllianceChat) {
+        inAllianceChat = false;
+        room.textContent = "Sala global";
+        globalButton.hidden = true;
+        messages.replaceChildren();
+        lastChat = "";
+      }
       await loadAlliance();
     } catch (error) { status.textContent = error.message; }
   }
@@ -292,6 +309,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     const state = await api("alliance?q=" + encodeURIComponent(allianceQuery));
     if (activeView !== "alliance") return;
     allianceCreate.hidden = allianceSearch.hidden = Boolean(state.alliance);
+    allianceInvite.hidden = state.alliance?.leader !== state.player;
     const actionButton = (label, action, fields) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -308,6 +326,11 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     if (state.alliance) {
       const {name, leader} = state.alliance;
       row(name + " · Líder: " + leader);
+      const chat = document.createElement("button");
+      chat.type = "button";
+      chat.textContent = "Abrir chat de alianza";
+      chat.addEventListener("click", () => switchRoom(name, true));
+      row("", chat);
       for (const username of state.members) {
         const actions = leader === state.player && username !== leader
           ? [actionButton("Transferir liderazgo", "transfer", {username})] : [];
@@ -317,8 +340,15 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
         "Solicitud de " + username + " ", actionButton("Aceptar", "accept", {username}),
         actionButton("Rechazar", "reject", {username})
       );
+      for (const username of state.outgoing) row(
+        "Invitación enviada a " + username + " ", actionButton("Retirar", "revoke_invite", {username})
+      );
       row("", actionButton(leader === state.player && state.members.length === 1 ? "Disolver alianza" : "Salir de la alianza", "leave"));
     } else {
+      for (const {id, name} of state.invites) row(
+        "Invitación de " + name + " ", actionButton("Aceptar", "join_invite", {alliance_id: id}),
+        actionButton("Rechazar", "decline_invite", {alliance_id: id})
+      );
       for (const {id, name, pending} of state.directory) row(name + " ", actionButton(
         pending ? "Cancelar solicitud" : "Solicitar ingreso", pending ? "cancel" : "request", {alliance_id: id}
       ));
@@ -329,6 +359,11 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
   allianceCreate.addEventListener("submit", event => {
     event.preventDefault();
     allianceAction("create", {name: allianceCreate.elements.name.value});
+  });
+  allianceInvite.addEventListener("submit", event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    allianceAction("invite", {username: form.elements.username.value});
   });
   allianceSearch.addEventListener("submit", async event => {
     event.preventDefault();

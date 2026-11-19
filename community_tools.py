@@ -22,6 +22,16 @@ DDL = (
         alliance_id TEXT NOT NULL REFERENCES alliances(id) ON DELETE CASCADE,
         PRIMARY KEY(username, alliance_id)
     )""",
+    """CREATE TABLE IF NOT EXISTS alliance_invites (
+        username TEXT NOT NULL REFERENCES accounts(username),
+        alliance_id TEXT NOT NULL REFERENCES alliances(id) ON DELETE CASCADE,
+        PRIMARY KEY(username, alliance_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS alliance_messages (
+        id TEXT PRIMARY KEY, alliance_id TEXT NOT NULL REFERENCES alliances(id) ON DELETE CASCADE,
+        author TEXT NOT NULL REFERENCES accounts(username), body TEXT NOT NULL, created BIGINT NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS alliance_message_order ON alliance_messages(alliance_id, created, id)",
     """CREATE TABLE IF NOT EXISTS hidden_chat_messages (
         message_id TEXT PRIMARY KEY REFERENCES chat_messages(id) ON DELETE CASCADE,
         moderator TEXT NOT NULL REFERENCES accounts(username), hidden_at BIGINT NOT NULL
@@ -68,6 +78,14 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                     "SELECT username FROM alliance_requests WHERE alliance_id=? ORDER BY username",
                     (group["id"],),
                 ).fetchall() if group and group["leader"] == player else []
+                invites = db.execute(
+                    """SELECT a.id, a.name FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id
+                       WHERE i.username=? ORDER BY a.slug""", (player,),
+                ).fetchall() if not group else []
+                outgoing = db.execute(
+                    "SELECT username FROM alliance_invites WHERE alliance_id=? ORDER BY username",
+                    (group["id"],),
+                ).fetchall() if group and group["leader"] == player else []
                 directory = db.execute(
                     """SELECT a.id, a.name, CASE WHEN EXISTS (
                        SELECT 1 FROM alliance_requests r WHERE r.alliance_id=a.id AND r.username=?
@@ -77,7 +95,8 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                 ).fetchall() if not group else []
             return jsonify(alliance=dict(group) if group else None, player=player,
                            members=[r["username"] for r in members], pending=[r["username"] for r in pending],
-                           directory=[dict(r) for r in directory])
+                           directory=[dict(r) for r in directory], invites=[dict(r) for r in invites],
+                           outgoing=[r["username"] for r in outgoing])
 
         verify_csrf()
         limit("alliance:" + player)
@@ -99,6 +118,7 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                 db.execute("INSERT INTO alliances VALUES (?, ?, ?, ?)", (group_id, name, name.casefold(), player))
                 db.execute("INSERT INTO alliance_members VALUES (?, ?)", (player, group_id))
                 db.execute("DELETE FROM alliance_requests WHERE username=?", (player,))
+                db.execute("DELETE FROM alliance_invites WHERE username=?", (player,))
             elif action in {"request", "cancel"}:
                 if member or not db.execute("SELECT 1 FROM alliances WHERE id=?", (group_id,)).fetchone():
                     return jsonify(error="La alianza no está disponible."), 409
@@ -117,6 +137,32 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                 if action == "accept":
                     db.execute("INSERT INTO alliance_members VALUES (?, ?) ON CONFLICT DO NOTHING", (candidate, gid))
                     db.execute("DELETE FROM alliance_requests WHERE username=?", (candidate,))
+                    db.execute("DELETE FROM alliance_invites WHERE username=?", (candidate,))
+            elif action in {"invite", "revoke_invite"}:
+                if not member or member["leader"] != player:
+                    abort(403)
+                candidate = request.form.get("username", "").strip().lower()[:32]
+                gid = member["id"]
+                if action == "invite":
+                    if not db.execute("SELECT 1 FROM accounts WHERE username=?", (candidate,)).fetchone():
+                        return jsonify(error="No encontramos a ese jugador."), 404
+                    if db.execute("SELECT 1 FROM alliance_members WHERE username=?", (candidate,)).fetchone():
+                        return jsonify(error="Ese jugador ya pertenece a una alianza."), 409
+                    db.execute("INSERT INTO alliance_invites VALUES (?, ?) ON CONFLICT DO NOTHING", (candidate, gid))
+                else:
+                    db.execute("DELETE FROM alliance_invites WHERE username=? AND alliance_id=?", (candidate, gid))
+            elif action in {"join_invite", "decline_invite"}:
+                if member:
+                    return jsonify(error="Ya perteneces a una alianza."), 409
+                invitation = db.execute(
+                    "DELETE FROM alliance_invites WHERE username=? AND alliance_id=?", (player, group_id)
+                )
+                if invitation.rowcount != 1:
+                    return jsonify(error="La invitación ya no está disponible."), 404
+                if action == "join_invite":
+                    db.execute("INSERT INTO alliance_members VALUES (?, ?)", (player, group_id))
+                    db.execute("DELETE FROM alliance_requests WHERE username=?", (player,))
+                    db.execute("DELETE FROM alliance_invites WHERE username=?", (player,))
             elif action == "leave":
                 if not member:
                     return jsonify(error="No perteneces a una alianza."), 409
@@ -136,6 +182,35 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
             else:
                 abort(400)
         return jsonify(ok=True)
+
+    @app.route("/social/alliance/chat", methods=["GET", "POST"])
+    def alliance_chat():
+        player = username()
+        posting = request.method == "POST"
+        if posting:
+            verify_csrf()
+            limit("alliance-chat:" + player)
+            message = request.form.get("message", "").strip()
+            if not 1 <= len(message) <= 300:
+                return jsonify(error="Escribe entre 1 y 300 caracteres."), 400
+        with connect() as db:
+            if posting:
+                db.execute("BEGIN IMMEDIATE")
+            member = db.execute("SELECT alliance_id FROM alliance_members WHERE username=?", (player,)).fetchone()
+            if not member:
+                return jsonify(error="El chat de alianza requiere una membresía activa."), 403
+            group = member["alliance_id"]
+            if posting:
+                db.execute("INSERT INTO alliance_messages VALUES (?, ?, ?, ?, ?)",
+                           (uuid.uuid4().hex, group, player, message, time.time_ns() // 1_000_000))
+                return jsonify(ok=True), 201
+            rows = db.execute(
+                """SELECT m.author, m.body, m.created FROM alliance_messages m
+                   JOIN alliance_members a ON m.alliance_id=a.alliance_id
+                   WHERE a.username=? AND m.alliance_id=?
+                   ORDER BY m.created DESC, m.id DESC LIMIT 50""", (player, group)
+            ).fetchall()
+        return jsonify(messages=[dict(row) for row in reversed(rows)])
 
     @app.get("/social/profile")
     def social_profile():
