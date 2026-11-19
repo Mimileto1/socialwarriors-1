@@ -4,6 +4,8 @@ import uuid
 from collections import defaultdict, deque
 from threading import Lock
 
+from community_tools import install_community_tools
+
 from flask import abort, jsonify, render_template, request
 
 
@@ -57,6 +59,8 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
                 abort(429)
             times.append(now)
 
+    install_community_tools(app, connect, current_account, verify_csrf, persistent, limit)
+
     @app.route("/social/chat", methods=["GET", "POST"])
     def social_chat():
         username = identity()
@@ -72,7 +76,9 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
             return jsonify(ok=True), 201
         with connect() as db:
             rows = db.execute(
-                "SELECT author, body, created FROM chat_messages ORDER BY created DESC, id DESC LIMIT 50"
+                """SELECT m.author, m.body, m.created FROM chat_messages m
+                   WHERE NOT EXISTS (SELECT 1 FROM hidden_chat_messages h WHERE h.message_id=m.id)
+                   ORDER BY m.created DESC, m.id DESC LIMIT 50"""
             ).fetchall()
         return jsonify(messages=[dict(row) for row in reversed(rows)])
 

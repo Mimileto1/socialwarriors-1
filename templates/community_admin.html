@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración de comunidad</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101a24;color:#edf4fa;font:16px system-ui}main{max-width:56rem;margin:auto;padding:1.2rem}
+a{color:#9bddff}article{background:#1b2a37;border:1px solid #38566e;padding:12px;border-radius:8px;margin:8px 0;overflow-wrap:anywhere}
+button{font:inherit;border:1px solid #5b7f98;border-radius:5px;background:#29445a;color:#fff;padding:5px 8px;cursor:pointer}
+small{color:#b9ccd8}h1,h2{line-height:1.2}
+</style>
+<main>
+<a href="/">Volver al juego</a>
+<h1>Administración de comunidad</h1>
+<p>{{ players }} cuentas · {{ alliances }} alianzas</p>
+<h2>Chat global reciente</h2>
+{% for item in messages %}
+<article><strong>{{ item.author }}</strong><p>{{ item.body }}</p>
+{% if item.moderator %}<small>Ocultado por {{ item.moderator }}</small>{% endif %}
+<form method="post">
+<input type="hidden" name="csrf" value="{{ account_csrf() }}">
+<input type="hidden" name="message" value="{{ item.id }}">
+<button name="action" value="{{ 'restore' if item.moderator else 'hide' }}">{{ 'Restaurar' if item.moderator else 'Ocultar' }}</button>
+</form></article>
+{% else %}<p>No hay mensajes.</p>{% endfor %}
+</main>
+</html>

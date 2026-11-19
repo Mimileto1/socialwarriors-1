@@ -1,9 +1,14 @@
 <aside class="game-community game-community-{{ community_theme }}" aria-label="Comunidad del juego">
-  <nav aria-label="Paneles de comunidad">
-    <button type="button" data-panel="chat" aria-pressed="true">Chat</button>
-    <button type="button" data-panel="neighbors" aria-pressed="false">Vecinos</button>
-    <button type="button" data-panel="invite" aria-pressed="false">Invitaciones</button>
+  <nav aria-label="Comunidad">
+    <button type="button" data-panel="chat" aria-expanded="false"><span aria-hidden="true">◈</span>Chat</button>
+    <button type="button" data-panel="neighbors" aria-expanded="false"><span aria-hidden="true">♟</span>Vecinos</button>
+    <button type="button" data-panel="invite" aria-expanded="false"><span aria-hidden="true">✉</span>Invitar</button>
+    <button type="button" data-panel="alliance" aria-expanded="false"><span aria-hidden="true">⚑</span>Alianza</button>
+    <button type="button" data-panel="profile" aria-expanded="false"><span aria-hidden="true">◉</span>Perfil</button>
+    {% if community_is_admin() %}<a href="/admin"><span aria-hidden="true">⚙</span>Admin</a>{% endif %}
   </nav>
+  <div class="community-drawer" id="community-drawer" hidden>
+    <header><h2 id="community-heading"></h2><button type="button" id="community-close" aria-label="Cerrar panel">×</button></header>
   <section data-view="chat" aria-label="Chat en vivo">
     <p><strong id="community-room">Sala global</strong> <button type="button" id="community-global" hidden>Volver al chat global</button></p>
     <ol id="community-messages" aria-label="Mensajes del chat"></ol>
@@ -32,19 +37,45 @@
       <button>Solicitar amistad</button>
     </form>
   </section>
+  <section data-view="alliance" aria-label="Alianza" hidden>
+    <form id="alliance-create"><label for="alliance-name">Nombre de la alianza</label>
+      <input id="alliance-name" name="name" minlength="3" maxlength="36" required>
+      <button>Crear alianza</button>
+    </form>
+    <form id="alliance-search"><label for="alliance-query">Buscar alianza</label>
+      <input id="alliance-query" name="q" maxlength="36"><button>Buscar</button>
+    </form>
+    <div id="alliance-details"></div>
+  </section>
+  <section data-view="profile" aria-label="Perfil" hidden><dl id="community-profile"></dl></section>
   <p id="community-status" role="status"></p>
+  </div>
 </aside>
 <style>
-.game-community{--panel:#f6f5ee;--ink:#19211b;--accent:#475630;color:var(--ink);background:var(--panel);
-font:15px system-ui,sans-serif;box-sizing:border-box;width:min(100%,760px);margin:16px auto;padding:12px 16px;
-border:2px solid var(--accent);border-radius:8px;text-align:left}
-.game-community-empires{--panel:#f7ead1;--ink:#492b1d;--accent:#784323}
-.game-community-city{--panel:#e9f6fc;--ink:#14354c;--accent:#20688b}
-.game-community nav{display:flex;gap:8px;margin-bottom:12px}.game-community nav button[aria-pressed=false]{opacity:.72}.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
-.game-community ol{max-height:12rem;overflow:auto}.game-community li{margin:4px 0}
-.game-community form{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
-.game-community input{min-width:8rem;flex:1}.game-community button{background:var(--accent);color:white;border:0;border-radius:4px;padding:6px 9px;cursor:pointer}
+.game-community{--panel:#18231d;--border:#7c9353;--accent:#d7e4a8;--ink:#f3f5e7;--control:#334438;
+position:fixed;z-index:6000;left:0;top:clamp(4.5rem,15vh,9rem);display:flex;align-items:flex-start;isolation:isolate;
+color:var(--ink);font:14px system-ui,sans-serif;text-align:left;max-width:100vw}
+.game-community-empires{--panel:#2c1e20;--border:#a77846;--accent:#ffd598;--ink:#f6e8d6;--control:#4d3229}
+.game-community-city{--panel:#112a42;--border:#3c92ad;--accent:#a7edf9;--ink:#edf8ff;--control:#1e435e}
+.game-community [hidden]{display:none!important}
+.game-community nav{display:grid;gap:3px;width:4.45rem;max-height:76vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-left:0;border-radius:0 12px 12px 0;padding:5px;box-shadow:0 8px 25px #0006;box-sizing:border-box}
+.game-community nav :is(button,a){display:grid;justify-items:center;text-decoration:none;font-size:.72rem;line-height:1.15;color:var(--ink);padding:6px 2px;background:none;border:1px solid transparent;border-radius:6px}
+.game-community nav span{color:var(--accent);font-size:1.25rem;line-height:1.2}
+.game-community nav :is(button,a):hover,.game-community nav [aria-expanded=true]{border-color:var(--border);background:var(--control)}
+.community-drawer{box-sizing:border-box;margin-left:.4rem;width:min(22rem,calc(100vw - 5.3rem));max-height:76vh;overflow:auto;
+background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0 14px 14px;box-shadow:0 12px 35px #0008;color:var(--ink)}
+.community-drawer header{position:sticky;top:0;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);margin-bottom:12px;padding:9px 0;z-index:1}
+.community-drawer h2{font-size:1.05rem;margin:0;color:var(--accent)}
+.game-community button{cursor:pointer;color:var(--ink);font:inherit;background:var(--control);border:1px solid var(--border);border-radius:6px;padding:5px 8px}
+.game-community :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
+.game-community ol{max-height:12rem;overflow:auto}.game-community li{margin:6px 0}
+.game-community form{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
+.game-community label{flex-basis:100%}
+.game-community input{box-sizing:border-box;min-width:0;flex:1;background:var(--ink);color:var(--panel);border:0;border-radius:4px;padding:6px}
+.game-community dt{font-weight:700}.game-community dd{margin:0 0 8px}
 #community-status:empty{display:none}
+@media(max-width:540px){.game-community{top:auto;bottom:10px}.game-community nav,.community-drawer{max-height:64vh}}
 </style>
 <script>
 (() => {
@@ -53,6 +84,11 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
   const friends = document.querySelector("#community-friends");
   const status = document.querySelector("#community-status");
   let peer = "";
+  let activeView = "";
+  const drawer = document.querySelector("#community-drawer");
+  const heading = document.querySelector("#community-heading");
+  const views = {chat: "Chat", neighbors: "Vecinos", invite: "Invitaciones", alliance: "Alianza", profile: "Perfil"};
+  let activeButton;
   const panel = messages.closest("aside");
   const inviteForm = document.querySelector("#community-invite");
   const link = document.querySelector("#community-link");
@@ -77,12 +113,33 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
     return data;
   }
   async function activate(view) {
-    for (const tab of tabs) tab.setAttribute("aria-pressed", String(tab.dataset.panel === view));
+    activeView = view;
+    drawer.hidden = !view;
+    heading.textContent = views[view] || "";
+    for (const tab of tabs) {
+      tab.setAttribute("aria-expanded", String(tab.dataset.panel === view));
+      tab.setAttribute("aria-controls", "community-drawer");
+    }
     for (const section of panel.querySelectorAll("[data-view]")) section.hidden = section.dataset.view !== view;
     if (view === "invite" && !link.value) {
       try { link.value = new URL((await api("invitation")).path, location.origin).href; }
       catch (error) { status.textContent = error.message; }
     }
+    try {
+      if (view === "alliance") await loadAlliance();
+      if (view === "profile") {
+        const player = await api("profile");
+        const fields = [["Usuario", player.username], ["Vecinos", player.neighbors], ["Alianza", player.alliance || "Sin alianza"]];
+        const profile = document.querySelector("#community-profile");
+        profile.replaceChildren(...fields.flatMap(([label, value]) => {
+          const title = document.createElement("dt"), detail = document.createElement("dd");
+          title.textContent = label;
+          detail.textContent = value;
+          return [title, detail];
+        }));
+      }
+    } catch (error) { status.textContent = error.message; }
+    refresh();
   }
   function chatPath() { return peer ? "private/" + encodeURIComponent(peer) : "chat"; }
   function switchRoom(next) {
@@ -94,7 +151,77 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
     activate("chat");
     refresh();
   }
-  tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.panel)));
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    activeButton = tab;
+    status.textContent = "";
+    activate(activeView === tab.dataset.panel ? "" : tab.dataset.panel);
+  }));
+  function closeDrawer() {
+    if (!activeView) return;
+    activate("");
+    activeButton?.focus();
+  }
+  document.querySelector("#community-close").addEventListener("click", closeDrawer);
+  panel.addEventListener("keydown", event => { if (event.key === "Escape") closeDrawer(); });
+
+  const allianceCreate = document.querySelector("#alliance-create");
+  const allianceSearch = document.querySelector("#alliance-search");
+  const allianceDetails = document.querySelector("#alliance-details");
+  let allianceQuery = "";
+  async function allianceAction(action, fields = {}) {
+    try {
+      await api("alliance", {action, ...fields});
+      status.textContent = "";
+      await loadAlliance();
+    } catch (error) { status.textContent = error.message; }
+  }
+  async function loadAlliance() {
+    const state = await api("alliance?q=" + encodeURIComponent(allianceQuery));
+    if (activeView !== "alliance") return;
+    allianceCreate.hidden = allianceSearch.hidden = Boolean(state.alliance);
+    const actionButton = (label, action, fields) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", () => allianceAction(action, fields));
+      return button;
+    };
+    const list = document.createElement("ul");
+    function row(label, ...actions) {
+      const li = document.createElement("li");
+      li.append(label, ...actions);
+      list.append(li);
+    }
+    if (state.alliance) {
+      const {name, leader} = state.alliance;
+      row(name + " · Líder: " + leader);
+      for (const username of state.members) {
+        const actions = leader === state.player && username !== leader
+          ? [actionButton("Transferir liderazgo", "transfer", {username})] : [];
+        row(username + " ", ...actions);
+      }
+      for (const username of state.pending) row(
+        "Solicitud de " + username + " ", actionButton("Aceptar", "accept", {username}),
+        actionButton("Rechazar", "reject", {username})
+      );
+      row("", actionButton(leader === state.player && state.members.length === 1 ? "Disolver alianza" : "Salir de la alianza", "leave"));
+    } else {
+      for (const {id, name, pending} of state.directory) row(name + " ", actionButton(
+        pending ? "Cancelar solicitud" : "Solicitar ingreso", pending ? "cancel" : "request", {alliance_id: id}
+      ));
+      if (!state.directory.length) row("No hay alianzas que coincidan.");
+    }
+    allianceDetails.replaceChildren(list);
+  }
+  allianceCreate.addEventListener("submit", event => {
+    event.preventDefault();
+    allianceAction("create", {name: allianceCreate.elements.name.value});
+  });
+  allianceSearch.addEventListener("submit", async event => {
+    event.preventDefault();
+    allianceQuery = allianceSearch.elements.q.value;
+    try { await loadAlliance(); } catch (error) { status.textContent = error.message; }
+  });
   globalButton.addEventListener("click", () => switchRoom(""));
   document.querySelector("#community-copy").addEventListener("click", async () => {
     if (!link.value) return;
@@ -147,13 +274,18 @@ border:2px solid var(--accent);border-radius:8px;text-align:left}
     }));
   }
   async function refresh() {
-    if (polling || stopped || document.hidden) return;
+    if (polling || stopped || document.hidden || !["chat", "neighbors"].includes(activeView)) return;
     polling = true;
     try {
-      const path = chatPath();
-      const [chat, list] = await Promise.all([api(path), api("friends")]);
-      if (path === chatPath()) renderChat(chat.messages);
-      renderFriends(list.friends);
+      const view = activeView;
+      if (view === "chat") {
+        const path = chatPath();
+        const chat = await api(path);
+        if (activeView === view && path === chatPath()) renderChat(chat.messages);
+      } else {
+        const list = await api("friends");
+        if (activeView === view) renderFriends(list.friends);
+      }
     } catch (error) {
       status.textContent = error.message;
     } finally {
