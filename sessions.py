@@ -87,7 +87,7 @@ def load_static_villages():
 
     # Static neighbors in /villages
     for file in os.listdir(VILLAGES_DIR):
-        if file == "initial.json" or not file.endswith(".json"):
+        if file in {"initial.json", "AcidCaos.json"} or not file.endswith(".json"):
             continue
         print(f" * Loading STATIC NEIGHBOUR: village at {file}... ", end='')
         village = json.load(open(os.path.join(VILLAGES_DIR, file)))
