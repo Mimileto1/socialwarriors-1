@@ -4,6 +4,8 @@ import re
 import time
 import uuid
 
+from clan_wars import install_clan_wars
+from neighbor_aid import install_neighbor_aid
 from community_http import chat_id, conditional_json
 from community_activities import install_activities
 from flask import abort, jsonify, redirect, render_template, request
@@ -66,7 +68,9 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
             abort(401)
         return account["username"]
 
+    install_neighbor_aid(app, connect, username, verify_csrf, persistent, limit, native_available=True)
     profile_title = install_activities(app, connect, username, is_admin, verify_csrf, persistent, limit)
+    install_clan_wars(app, connect, username, verify_csrf, persistent, limit)
 
     @app.route("/social/alliance", methods=["GET", "POST"])
     def social_alliance():

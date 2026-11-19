@@ -3,7 +3,9 @@
     <button type="button" data-panel="chat" aria-expanded="false"><span aria-hidden="true">☵</span>Chat</button>
     <button type="button" data-panel="neighbors" aria-expanded="false"><span aria-hidden="true">♟</span>Vecinos</button>
     <button type="button" data-panel="invite" aria-expanded="false"><span aria-hidden="true">✉</span>Invitar</button>
+    <button type="button" data-panel="aid" aria-expanded="false"><span aria-hidden="true">✚</span>Ayudas</button>
     <button type="button" data-panel="alliance" aria-expanded="false"><span aria-hidden="true">⚑</span>Alianza</button>
+    <button type="button" data-panel="wars" aria-expanded="false"><span aria-hidden="true">⚔</span>Guerras</button>
     <button type="button" data-panel="events" aria-expanded="false"><span aria-hidden="true">✦</span>Eventos</button>
     <button type="button" data-panel="ranking" aria-expanded="false"><span aria-hidden="true">▥</span>Clasif.</button>
     <button type="button" data-panel="rewards" aria-expanded="false"><span aria-hidden="true">✿</span>Bonos</button>
@@ -12,9 +14,11 @@
   </nav>
   <div class="community-drawer" id="community-drawer" role="region" aria-labelledby="community-heading" hidden>
     <header>
-      <div><h2 id="community-heading"></h2><p class="community-connection" id="community-connection" role="status"></p></div>
-      <button type="button" id="community-retry" hidden>Reintentar</button>
-      <button type="button" id="community-close" aria-label="Cerrar panel">×</button>
+      <div class="community-headgroup"><h2 id="community-heading"></h2><p class="community-connection" id="community-connection" role="status"></p></div>
+      <div class="community-header-actions">
+        <button type="button" id="community-retry" hidden>Reintentar</button>
+        <button type="button" id="community-close" aria-label="Cerrar panel">×</button>
+      </div>
     </header>
   <section data-view="chat" aria-label="Chat en vivo">
     <p id="community-room-row"><strong id="community-room">Sala global</strong> <button type="button" id="community-global" hidden>Volver al chat global</button></p>
@@ -59,6 +63,50 @@
       <button>Enviar invitación</button>
     </form>
     <div id="alliance-details"></div>
+  </section>
+  <section data-view="aid" aria-label="Ayudas y piezas" hidden>
+    <div class="community-section-head">
+      <h3>Solicitudes vecinales</h3>
+      <button type="button" id="community-aid-refresh" class="community-quiet">Actualizar</button>
+    </div>
+    <form id="community-aid-form" class="community-card community-stacked" hidden>
+      <label>Vecino<select name="username" required></select></label>
+      <label>¿Qué necesitas?
+        <select name="kind">
+          <option value="piece">Pedir una pieza</option>
+          <option value="help">Pedir ayuda</option>
+        </select>
+      </label>
+      <label id="community-aid-piece">Pieza<select name="item" required></select></label>
+      <label>Mensaje opcional<input name="note" maxlength="160"></label>
+      <button type="submit">Enviar solicitud</button>
+    </form>
+    <p id="community-aid-empty" class="community-empty" hidden>Agrega un vecino para enviar solicitudes.</p>
+    <h3>Pendientes</h3>
+    <ul id="community-aid-pending" class="community-card-list"></ul>
+    <details class="community-details" id="community-aid-history" hidden>
+      <summary>Solicitudes anteriores</summary>
+      <ul id="community-aid-past" class="community-card-list"></ul>
+    </details>
+    <h3>Piezas y refuerzos</h3>
+    <p class="community-hint">Las ayudas aceptadas también envían un refuerzo a tu partida.</p>
+    <p id="community-aid-delivery" class="community-hint" role="status" hidden></p>
+    <ul id="community-aid-inventory" class="community-card-list"></ul>
+  </section>
+  <section data-view="wars" aria-label="Guerras de clanes" hidden>
+    <div class="community-section-head">
+      <h3>Tablero de guerra</h3>
+      <button type="button" id="community-wars-refresh" class="community-quiet">Actualizar</button>
+    </div>
+    <div id="community-war-current"></div>
+    <form id="community-war-challenge" class="community-card community-stacked" hidden>
+      <label>Clan rival<select name="alliance_id" required></select></label>
+      <button type="submit">Enviar desafío</button>
+    </form>
+    <h3>Desafíos pendientes</h3>
+    <ul id="community-war-challenges" class="community-card-list"></ul>
+    <h3>Guerras anteriores</h3>
+    <ul id="community-war-history" class="community-card-list"></ul>
   </section>
   <section data-view="events" aria-label="Eventos" hidden><div id="community-events"></div></section>
   <section data-view="ranking" aria-label="Clasificación" hidden><p>Puntos de comunidad ganados</p><ol id="community-rankings"></ol></section>
@@ -170,6 +218,121 @@
   .community-drawer { width:auto; margin:0 5px 6px; max-height:64vh; max-height:64dvh; }
   .game-community nav [aria-expanded=true]::before { inset:auto 8px 0; width:auto; height:2px }
 }
+.game-community {
+  --wash:#a8cf6614;
+  --emblem:#cadf97;
+  --header:#202f25;
+}
+.game-community-empires { --wash:#ffc48419; --emblem:#ffd597; --header:#38252d; }
+.game-community-city { --wash:#64d8ed18; --emblem:#a3e8f6; --header:#193449; }
+.game-community nav {
+  background:linear-gradient(155deg,var(--header),var(--panel) 41%);
+  gap:3px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+.game-community nav :is(button,a) {
+  min-height:2.55rem;
+  border-radius:10px;
+  transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+.game-community nav :is(button,a)>span {
+  display:grid;
+  place-items:center;
+  color:var(--emblem);
+  min-width:23px;
+  min-height:20px;
+  border-radius:6px;
+  background:var(--wash);
+}
+.game-community nav :is(button,a):hover > span,
+.game-community nav [aria-expanded=true]>span { background:var(--surface); }
+.community-drawer {
+  width:min(29rem,calc(100vw - 5.65rem));
+  padding-inline:17px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+  background:radial-gradient(ellipse at 0 3%,var(--wash),transparent 55%),var(--panel);
+}
+.community-drawer header {
+  margin-inline:-17px;
+  padding-inline:17px;
+  background:linear-gradient(130deg,var(--header),var(--panel) 74%);
+}
+.community-drawer .community-headgroup { min-width:0; flex:1; }
+.community-drawer .community-headgroup h2 { font-size:1.24rem; letter-spacing:.015em; overflow-wrap:anywhere; }
+.community-drawer .community-header-actions { display:flex; gap:.4rem; align-items:center; }
+.community-header-actions #community-close { min-width:35px; font-size:1.3rem; line-height:1.05; }
+.game-community select {
+  min-width:0;
+  min-height:35px;
+  background:var(--surface);
+  color:var(--ink);
+  border:1px solid var(--line);
+  border-radius:7px;
+  padding:6px 8px;
+  font:inherit;
+}
+.community-section-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.55rem; }
+.community-section-head h3 { margin:0; }
+.game-community .community-quiet { background:transparent; }
+.community-drawer :is(.community-card,.community-card-list>li) {
+  background:linear-gradient(125deg,var(--wash),transparent 70%),var(--surface);
+  border:1px solid color-mix(in srgb,var(--line) 64%,transparent);
+  border-radius:11px;
+  padding:11px 12px;
+  margin:0 0 .55rem;
+  overflow-wrap:anywhere;
+}
+.community-card-list>li:last-child { margin-bottom:0; }
+.community-card-list .community-empty { background:transparent; }
+.community-drawer .community-card :is(h3,h4,p), .community-drawer .community-card-list :is(h4,p) { margin:.3rem 0; }
+.community-drawer .community-card h3, .community-drawer .community-card h4,
+.community-drawer .community-card-list h4 { color:var(--ink); font-size:1rem; }
+.community-drawer .community-card-head { display:flex; justify-content:space-between; align-items:baseline; gap:.55rem; }
+.community-drawer .community-card-head h4 { margin:0; }
+.community-drawer .community-chip { color:var(--accent); background:var(--wash); padding:.12rem .45rem; border-radius:999px; font-size:.75rem; font-weight:680; }
+.community-drawer .community-chip[data-tone="quiet"] { color:var(--muted); }
+.community-drawer .community-hint, .community-drawer .community-empty { color:var(--muted); font-size:.85rem; }
+.community-drawer .community-empty { margin:.45rem 0 .6rem; }
+.community-drawer .community-actions { display:flex; gap:.42rem; align-items:center; flex-wrap:wrap; margin-top:.55rem; }
+.community-drawer .community-actions button { margin:0; }
+.community-drawer .community-primary:enabled { color:var(--accent-ink); background:var(--accent); }
+.community-drawer .community-stacked { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.55rem .65rem; }
+.community-drawer .community-stacked label { display:grid; gap:.25rem; }
+.community-drawer .community-stacked label:has(input) { grid-column:1/-1; }
+.community-drawer .community-stacked select { width:100%; }
+.community-drawer .community-stacked button { justify-self:start; grid-column:1/-1; }
+.community-drawer .community-details { margin-top:.7rem; }
+.community-drawer .community-details > summary { cursor:pointer; color:var(--accent); }
+.community-drawer .community-details > ul { margin-top:.55rem; }
+.community-drawer .community-versus {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  margin:.4rem 0 .2rem;
+  gap:.45rem;
+  text-align:center;
+}
+.community-drawer .community-versus > div { display:grid; gap:.15rem; text-wrap:balance; min-width:0; }
+.community-drawer .community-versus .community-score { font-size:1.6rem; line-height:1; color:var(--accent); font-weight:750; font-variant-numeric:tabular-nums; }
+.community-drawer .community-war-sectors { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.community-drawer .community-war-sectors button { min-height:42px; width:100%; }
+.community-drawer .community-war-sectors [aria-pressed=true] { color:var(--accent-ink); background:var(--accent); opacity:1; }
+.community-drawer .community-meter { display:grid; gap:.2rem; margin:.5rem 0; color:var(--muted); font-size:.84rem; }
+.community-drawer .community-meter progress { width:100%; height:10px; accent-color:var(--accent); }
+@media (max-width:600px) {
+  .community-drawer { width:auto; padding-inline:12px; }
+  .community-drawer header { margin-inline:-12px; padding-inline:12px; }
+  .game-community nav :is(button,a) { min-height:42px; }
+}
+@media (max-width:375px) {
+  .community-drawer .community-stacked { grid-template-columns:minmax(0,1fr); }
+  .community-drawer .community-actions { gap:.34rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .game-community nav :is(button,a) { transition:none; }
+}
 </style>
 <script>
 (() => {
@@ -184,7 +347,7 @@
   let activeView = "";
   const drawer = document.querySelector("#community-drawer");
   const heading = document.querySelector("#community-heading");
-  const views = {chat: "Chat", neighbors: "Vecinos", invite: "Invitaciones", alliance: "Alianza", events: "Eventos", ranking: "Clasificación", rewards: "Bonos y tienda", profile: "Perfil"};
+  const views = {chat: "Chat", neighbors: "Vecinos", invite: "Invitaciones", alliance: "Alianza", aid: "Ayudas y piezas", wars: "Guerras de clanes", events: "Eventos", ranking: "Clasificación", rewards: "Bonos y tienda", profile: "Perfil"};
   let activeButton;
   const panel = messages.closest("aside");
   const inviteForm = document.querySelector("#community-invite");
@@ -283,6 +446,8 @@
     try {
       if (view === "alliance") await loadAlliance();
       if (view === "events") await loadEvents();
+      if (view === "aid") await loadAid();
+      if (view === "wars") await loadWars();
       if (view === "ranking") await loadRanking();
       if (view === "rewards") await loadRewards();
       if (view === "profile") {
@@ -323,31 +488,339 @@
     status.textContent = "Actualizado.";
     await reload();
   }
+  function panelNode(tag, text = "", className = "") {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== "") node.textContent = text;
+    return node;
+  }
+  function panelDate(seconds) {
+    return Number(seconds) > 0 ? dateLabel.format(new Date(seconds * 1000)) : "";
+  }
+  function panelChip(text, tone = "") {
+    const chip = panelNode("span", text, "community-chip");
+    if (tone) chip.dataset.tone = tone;
+    return chip;
+  }
+  function panelCard(title, badge) {
+    const card = panelNode("li");
+    const header = panelNode("div", "", "community-card-head");
+    header.append(panelNode("h4", title));
+    if (badge) header.append(badge);
+    card.append(header);
+    return card;
+  }
+  function panelActions(card, ...buttons) {
+    if (!buttons.length) return;
+    const row = panelNode("div", "", "community-actions");
+    row.append(...buttons);
+    card.append(row);
+  }
+  function leadAction(label, handler, disabled = false) {
+    const button = actionButton(label, handler, disabled);
+    button.classList.add("community-primary");
+    return button;
+  }
+  function pickPanel(view) {
+    activeButton = Array.from(tabs).find(tab => tab.dataset.panel === view) || activeButton;
+    status.textContent = "";
+    return activate(view);
+  }
+
+  const aidForm = document.querySelector("#community-aid-form");
+  const aidPiece = document.querySelector("#community-aid-piece");
+  const aidDrafts = new Map();
+  let aidPrefill;
+  let aidRevision = 0;
+  const aidLabels = {pending:"Pendiente", fulfilled:"Atendida", rejected:"Rechazada", canceled:"Retirada", cancelled:"Retirada"};
+
+  function resumeAidKind() {
+    const isPiece = aidForm.elements.kind.value === "piece";
+    aidPiece.hidden = !isPiece;
+    aidForm.elements.item.required = isPiece;
+  }
+  function rewriteOptions(select, options, selected) {
+    select.replaceChildren(...options.map(({value, label}) => {
+      const option = panelNode("option", label);
+      option.value = value;
+      return option;
+    }));
+    if (options.some(option => option.value === selected)) select.value = selected;
+  }
+  function draftToken(key) {
+    if (!aidDrafts.has(key)) {
+      if (aidDrafts.size >= 20) aidDrafts.delete(aidDrafts.keys().next().value);
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, "0")).join("");
+      aidDrafts.set(key, token);
+    }
+    return aidDrafts.get(key);
+  }
+  async function sendAid(fields, feedback, needsNonce = false, onSuccess) {
+    const key = JSON.stringify(fields);
+    if (needsNonce) fields = {...fields, nonce:draftToken(key)};
+    await api("aid", fields);
+    aidDrafts.delete(key);
+    onSuccess?.();
+    if (activeView === "aid") {
+      status.textContent = feedback;
+      await loadAid();
+    }
+  }
+  function aidRequestCard(request, labels) {
+    const piece = labels.get(request.item) || "Pieza";
+    const title = request.kind === "piece" ? piece : "Ayuda general";
+    const card = panelCard(title, panelChip(aidLabels[request.status] || request.status, request.status === "pending" ? "" : "quiet"));
+    const direction = request.incoming ? "De " + request.sender : "Para " + request.recipient;
+    card.append(panelNode("p", direction + (request.created ? " · " + panelDate(request.created / 1000) : ""), "community-hint"));
+    if (request.note) card.append(panelNode("p", request.note));
+    if (request.status === "pending") {
+      const act = (action, feedback) => () => sendAid({action, id:request.id}, feedback);
+      if (request.incoming && request.active) {
+        panelActions(card,
+          leadAction(request.kind === "piece" ? "Enviar pieza" : "Confirmar ayuda", act("fulfill", "Solicitud atendida.")),
+          actionButton("Rechazar", act("reject", "Solicitud rechazada."))
+        );
+      } else if (request.incoming) {
+        card.append(panelNode("p", "La amistad ya no está activa.", "community-hint"));
+        panelActions(card, actionButton("Rechazar", act("reject", "Solicitud rechazada.")));
+      } else {
+        panelActions(card, actionButton("Retirar solicitud", act("cancel", "Solicitud retirada.")));
+      }
+    }
+    return card;
+  }
+  async function loadAid() {
+    const revision = ++aidRevision;
+    const data = await api("aid");
+    if (activeView !== "aid" || revision !== aidRevision) return;
+    const {neighbors, catalog, requests, inventory, redeem_points, native_available, pending_delivery} = data;
+    const delivery = document.querySelector("#community-aid-delivery");
+    const waiting = Number(pending_delivery) || 0;
+    delivery.hidden = !waiting;
+    delivery.textContent = waiting > 0
+      ? (waiting === 1 ? "1 pieza pendiente de entrega." : waiting + " piezas pendientes de entrega.") + " Vuelve a abrir la partida para recibirlas."
+      : "";
+    const names = new Map(catalog.map(item => [item.id, item.label]));
+    const currentNeighbor = aidPrefill?.username || aidForm.elements.username.value;
+    const currentKind = aidPrefill?.kind || aidForm.elements.kind.value;
+    rewriteOptions(aidForm.elements.username, neighbors.map(name => ({value:name,label:name})), currentNeighbor);
+    rewriteOptions(aidForm.elements.item, catalog.map(item => ({value:item.id,label:item.label})), aidForm.elements.item.value);
+    if (currentKind) aidForm.elements.kind.value = currentKind;
+    aidPrefill = undefined;
+    aidForm.hidden = neighbors.length === 0;
+    document.querySelector("#community-aid-empty").hidden = neighbors.length > 0;
+    resumeAidKind();
+    const pending = requests.filter(request => request.status === "pending");
+    const past = requests.filter(request => request.status !== "pending");
+    document.querySelector("#community-aid-pending").replaceChildren(...(
+      pending.length ? pending.map(request => aidRequestCard(request, names)) : [panelNode("li", "No tienes solicitudes pendientes.", "community-empty")]
+    ));
+    document.querySelector("#community-aid-history").hidden = past.length === 0;
+    document.querySelector("#community-aid-past").replaceChildren(...past.map(request => aidRequestCard(request, names)));
+    const stock = catalog.filter(({id}) => Number(inventory[id]) > 0).map(({id, label}) => {
+      const card = panelCard(label, panelChip(String(inventory[id])));
+      const actions = [];
+      if (native_available) actions.push(leadAction("Enviar a la partida", () => sendAid(
+        {action:"deliver", item:id},
+        "Entrega pendiente. Vuelve a abrir la partida.",
+        true
+      )));
+      if (Number(redeem_points) > 0) actions.push(actionButton("Canjear · +" + redeem_points + " puntos", () => sendAid(
+        {action:"redeem", item:id},
+        "Pieza canjeada por puntos de comunidad.",
+        true
+      )));
+      panelActions(card, ...actions);
+      return card;
+    });
+    document.querySelector("#community-aid-inventory").replaceChildren(...(
+      stock.length ? stock : [panelNode("li", "Las piezas que te envíen aparecerán aquí.", "community-empty")]
+    ));
+  }
+  aidForm.elements.kind.addEventListener("change", resumeAidKind);
+  aidForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = aidForm.querySelector("button");
+    button.disabled = true;
+    try {
+      await sendAid({
+        action:"request",
+        username:aidForm.elements.username.value,
+        kind:aidForm.elements.kind.value,
+        item:aidForm.elements.kind.value === "piece" ? aidForm.elements.item.value : "",
+        note:aidForm.elements.note.value.trim()
+      }, "Solicitud enviada.", true, () => { aidForm.elements.note.value = ""; });
+    } catch (error) {
+      status.textContent = error.message;
+    } finally { button.disabled = false; }
+  });
+
+  const warForm = document.querySelector("#community-war-challenge");
+  const sectors = {north:"Norte", center:"Centro", south:"Sur"};
+  let warRevision = 0;
+  async function sendWar(fields, feedback) {
+    await api("clan-wars", fields);
+    if (activeView === "wars") {
+      status.textContent = feedback;
+      await loadWars();
+    }
+  }
+  function warBoard(match, showScore) {
+    const board = panelNode("div", "", "community-versus");
+    function side(name, score) {
+      const column = panelNode("div");
+      column.append(panelNode("strong", name));
+      if (showScore) column.append(panelNode("span", String(score), "community-score"));
+      return column;
+    }
+    board.append(
+      side(match.attacker, match.score?.attacker ?? 0),
+      panelNode("span", "vs.", "community-hint"),
+      side(match.defender, match.score?.defender ?? 0)
+    );
+    return board;
+  }
+  function activeWarCard(data) {
+    const {war, deployment_cost, points_balance, now} = data;
+    const card = panelNode("article", "", "community-card");
+    const time = Number(now) < Number(war.starts_at) ? "Inicia " + panelDate(war.starts_at) : "Termina " + panelDate(war.ends_at);
+    card.append(panelChip("Ronda " + war.round + " de 3"), warBoard(war, true), panelNode("p", time, "community-hint"));
+    if (war.selected) card.append(panelNode("p", "Tu despliegue: " + sectors[war.selected]));
+    else if (!war.can_deploy && Number(points_balance) < Number(deployment_cost)) {
+      card.append(panelNode("p","Te faltan puntos de comunidad para desplegar.", "community-hint"));
+    }
+    const grid = panelNode("div", "", "community-actions community-war-sectors");
+    grid.setAttribute("aria-label", "Sectores del tablero");
+    for (const [sector, label] of Object.entries(sectors)) {
+      const button = actionButton(label + " · " + (war.own_allocations?.[sector] ?? 0), () => sendWar(
+        {action:"deploy", war_id:war.id, round:war.round, sector},
+        "Despliegue confirmado."
+      ), !war.can_deploy);
+      button.setAttribute("aria-label", label + ", " + (war.own_allocations?.[sector] ?? 0) + " despliegues de tu clan");
+      button.setAttribute("aria-pressed", String(war.selected === sector));
+      grid.append(button);
+    }
+    card.append(grid);
+    if (Number(deployment_cost) > 0) {
+      card.append(panelNode("p", "Cada despliegue cuesta " + deployment_cost + " puntos. Saldo: " + points_balance + ".", "community-hint"));
+    }
+    if (war.deployment_cap) card.append(panelNode("p", "Cupo por clan y ronda: " + war.deployment_cap + ".", "community-hint"));
+    const rules = panelNode("details", "", "community-details");
+    rules.append(panelNode("summary", "Cómo se decide la victoria"),
+      panelNode("p", "La guerra tiene tres rondas de 24 horas. Al cerrar cada ronda, el clan con más despliegues en un sector gana un punto. En caso de empate, el sector no suma.", "community-hint"));
+    card.append(rules);
+    if (war.rounds?.length) {
+      const details = panelNode("details", "", "community-details");
+      details.append(panelNode("summary", "Resultados de rondas"));
+      const list = panelNode("ul", "", "community-card-list");
+      for (const round of war.rounds) {
+        const result = panelCard("Ronda " + round.round);
+        for (const [sector, label] of Object.entries(sectors)) {
+          result.append(panelNode("p", label + ": " + (round.attacker?.[sector] ?? 0) + " – " + (round.defender?.[sector] ?? 0), "community-hint"));
+        }
+        list.append(result);
+      }
+      details.append(list);
+      card.append(details);
+    }
+    return card;
+  }
+  async function loadWars() {
+    const revision = ++warRevision;
+    const state = await api("clan-wars");
+    if (activeView !== "wars" || revision !== warRevision) return;
+    const {alliance, war, challenges, history, targets} = state;
+    const current = document.querySelector("#community-war-current");
+    current.replaceChildren(war ? activeWarCard(state) : panelNode("p", alliance ? "Tu clan aún no tiene una guerra activa." : "Únete a una alianza para participar.", "community-empty"));
+    if (!alliance) panelActions(current, actionButton("Ver alianzas", () => pickPanel("alliance")));
+    warForm.hidden = !alliance?.leader || Boolean(war) || !targets.length;
+    if (!warForm.hidden) rewriteOptions(warForm.elements.alliance_id, targets.map(({id,name}) => ({value:id,label:name})), warForm.elements.alliance_id.value);
+    const incoming = challenges.map(challenge => {
+      const card = panelCard(challenge.incoming ? "Desafío recibido" : "Desafío enviado", panelChip("Pendiente"));
+      card.append(warBoard(challenge, false));
+      if (challenge.expires_at) card.append(panelNode("p", "Vence " + panelDate(challenge.expires_at), "community-hint"));
+      const act = (action, feedback) => () => sendWar({action, war_id:challenge.id}, feedback);
+      if (alliance?.leader) {
+        if (challenge.incoming) panelActions(card,
+          leadAction("Aceptar desafío", act("accept", "La guerra ha comenzado.")),
+          actionButton("Declinar", act("decline", "Desafío rechazado."))
+        );
+        else panelActions(card, actionButton("Retirar desafío", act("cancel", "Desafío retirado.")));
+      }
+      return card;
+    });
+    document.querySelector("#community-war-challenges").replaceChildren(...(
+      incoming.length ? incoming : [panelNode("li", "No hay desafíos pendientes.", "community-empty")]
+    ));
+    const past = history.map(match => {
+      const result = match.winner === "draw" ? "Empate" : "Ganó " + match[match.winner];
+      const card = panelCard(result, panelChip("Finalizada", "quiet"));
+      card.append(warBoard(match, true), panelNode("p", panelDate(match.ends_at), "community-hint"));
+      return card;
+    });
+    document.querySelector("#community-war-history").replaceChildren(...(
+      past.length ? past : [panelNode("li", "Aún no hay resultados.", "community-empty")]
+    ));
+  }
+  warForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = warForm.querySelector("button");
+    button.disabled = true;
+    try {
+      await sendWar({action:"challenge", alliance_id:warForm.elements.alliance_id.value}, "Desafío enviado.");
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+  for (const [selector, loader] of [["#community-aid-refresh",loadAid],["#community-wars-refresh",loadWars]]) {
+    const button = document.querySelector(selector);
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try { status.textContent = ""; await loader(); }
+      catch (error) { status.textContent = error.message; }
+      finally { button.disabled = false; }
+    });
+  }
+
   async function loadEvents() {
     const state = await api("events");
     if (activeView !== "events") return;
-    const list = document.createElement("ul");
-    for (const e of state.events) {
-      const entry = document.createElement("li");
-      const title = document.createElement("strong");
-      title.textContent = e.title;
-      const description = document.createElement("p");
-      description.textContent = e.description;
-      const open = !e.closed && e.starts <= state.now && e.ends > state.now;
-      const window = document.createElement("p");
-      window.textContent = e.closed ? "Cerrado" : dateLabel.format(new Date(e.starts * 1000)) + " – " + dateLabel.format(new Date(e.ends * 1000));
-      entry.append(title, description, window);
-      if (open || e.claimed) entry.append(actionButton(
-        e.claimed ? "Recompensa reclamada" : "Participar · " + e.points + " puntos",
-        () => reward("event", e.id, loadEvents), Boolean(e.claimed)
+    const list = panelNode("ul", "", "community-card-list");
+    const labels = {scheduled:"Programado", active:"En curso", claim:"Premios disponibles", finished:"Finalizado", closed:"Cerrado"};
+    for (const event of state.events) {
+      const phase = event.phase || (event.closed ? "closed" : event.starts > state.now ? "scheduled" : event.ends <= state.now ? "finished" : "active");
+      const goal = event.goal;
+      const card = panelCard(event.title, panelChip(labels[phase] || phase, ["closed","finished"].includes(phase) ? "quiet" : ""));
+      if (event.description) card.append(panelNode("p", event.description));
+      const timing = phase === "claim" && event.claim_until ? "Reclama hasta " + panelDate(event.claim_until)
+        : panelDate(event.starts) + " – " + panelDate(event.ends);
+      card.append(panelNode("p", timing, "community-hint"), panelNode("p", "Premio: " + event.points + " puntos de comunidad"));
+      if (goal && goal.kind !== "checkin") {
+        const progress = panelNode("label", "", "community-meter");
+        const description = goal.kind === "piece" ? "Vecinos a quienes enviaste piezas" : "Vecinos a quienes ayudaste";
+        const meter = panelNode("progress");
+        meter.max = Number(goal.target) || 1;
+        meter.value = Math.max(0, Number(goal.progress) || 0);
+        progress.append(panelNode("span", description + ": " + meter.value + " de " + meter.max), meter);
+        card.append(progress);
+      }
+      const actions = [];
+      const claimable = event.claimable ?? (phase === "active" && !event.claimed);
+      if (claimable || event.claimed) actions.push(leadAction(
+        event.claimed ? "Premio reclamado" : (goal?.kind && goal.kind !== "checkin" ? "Reclamar premio" : "Participar y reclamar"),
+        () => reward("event", event.id, loadEvents),
+        Boolean(event.claimed)
       ));
-      entry.append(actionButton("Participantes", async () => {
-        rankingEvent = e.id;
-        await activate("ranking");
+      else if (phase === "active" && goal?.kind && goal.kind !== "checkin") {
+        actions.push(actionButton("Abrir Ayudas", () => pickPanel("aid")));
+      }
+      actions.push(actionButton("Ver clasificación", async () => {
+        rankingEvent = event.id;
+        await pickPanel("ranking");
       }));
-      list.append(entry);
+      panelActions(card, ...actions);
+      list.append(card);
     }
-    if (!state.events.length) labeledRow(list, "Aún no hay eventos publicados.");
+    if (!state.events.length) list.append(panelNode("li", "Aún no hay eventos publicados.", "community-empty"));
     document.querySelector("#community-events").replaceChildren(list);
   }
   async function loadRanking() {
@@ -455,6 +928,13 @@
       button.addEventListener("click", () => allianceAction(action, fields));
       return button;
     };
+    function actionButtonForWars() {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Abrir guerras";
+      button.addEventListener("click", () => pickPanel("wars"));
+      return button;
+    }
     const list = document.createElement("ul");
     function row(label, ...actions) {
       const li = document.createElement("li");
@@ -468,7 +948,7 @@
       chat.type = "button";
       chat.textContent = "Abrir chat de alianza";
       chat.addEventListener("click", () => switchRoom(name, true));
-      row("", chat);
+      row("", chat, actionButtonForWars());
       for (const username of state.members) {
         const actions = leader === state.player && username !== leader
           ? [actionButton("Transferir liderazgo", "transfer", {username})] : [];
@@ -565,7 +1045,10 @@
         const chat = document.createElement("button");
         chat.textContent = "Chat privado";
         chat.addEventListener("click", () => switchRoom(username));
-        item.append(chat, " ");
+        item.append(chat, " ", actionButton("Pedir ayuda o piezas", () => {
+          aidPrefill = {username, kind:"piece"};
+          return pickPanel("aid");
+        }), " ");
       }
       for (const [action, label] of actions) {
         const button = document.createElement("button");

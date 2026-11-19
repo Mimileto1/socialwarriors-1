@@ -5,7 +5,7 @@
 *{box-sizing:border-box}body{margin:0;color:#edf4fa;background:#101a24;font:16px system-ui}
 main{max-width:64rem;margin:auto;padding:1.25rem}a{color:#a1e5ff}.layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,23rem),1fr));gap:18px}
 section{background:#1b2a37;border:1px solid #39576b;border-radius:12px;padding:16px}label{display:grid;margin:8px 0;gap:4px}
-input,textarea,button{font:inherit;padding:7px;border-radius:5px;border:1px solid #607990}button{background:#2c4760;color:white;cursor:pointer}
+input,select,textarea,button{font:inherit;padding:7px;border-radius:5px;border:1px solid #607990}button{background:#2c4760;color:white;cursor:pointer}
 li{margin:10px 0;overflow-wrap:anywhere}li form{display:inline}
 </style>
 <main><a href="/admin">Volver a administración</a><h1>Eventos y recompensas</h1>
@@ -16,10 +16,17 @@ li{margin:10px 0;overflow-wrap:anywhere}li form{display:inline}
 <label>Descripción<textarea name="description" maxlength="500" rows="3"></textarea></label>
 <label>Horas hasta el inicio<input name="delay" type="number" min="0" max="720" value="0" required></label>
 <label>Duración en horas<input name="hours" type="number" min="1" max="720" value="24" required></label>
+<label>Objetivo<select name="goal_kind">
+<option value="checkin">Participar en el evento</option>
+<option value="help">Responder a solicitudes de ayuda</option>
+<option value="piece">Enviar piezas solicitadas</option>
+</select></label>
+<label>Vecinos distintos para un objetivo de ayuda o piezas<input type="number" name="goal_target" min="1" max="50" value="2" required></label>
 <label>Puntos por jugador<input name="points" type="number" min="1" max="1000" value="20" required></label>
 <button name="action" value="event">Publicar evento</button>
 </form><h3>Eventos creados</h3><ul>{% for event in events %}
 <li>{{ event.title }} · {{ event.points }} puntos
+{% if event.kind %} · {{ event.target }} vecinos {{ 'ayudados' if event.kind == 'help' else 'con piezas entregadas' }}{% endif %}
 {% if event.closed %} · Cerrado{% else %}
 <form method="post"><input type="hidden" name="csrf" value="{{ account_csrf() }}"><input type="hidden" name="id" value="{{ event.id }}">
 <button name="action" value="close_event">Cerrar evento</button></form>{% endif %}</li>

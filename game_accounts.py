@@ -11,6 +11,7 @@ import time
 from threading import RLock
 
 import durable
+from native_pieces import deliver_native_pieces
 from social_play import install_social
 
 from flask import abort, g, redirect, render_template, request, session, url_for
@@ -42,6 +43,7 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
     if os.environ.get("RENDER") == "true" and not durable.DATABASE_URL and not os.environ.get("GAME_DATA_DIR"):
         raise RuntimeError("Configure GAME_DATABASE_URL or a persistent GAME_DATA_DIR before starting this service.")
     app.config.update(
+        COMMUNITY_THEME=theme,
         SECRET_KEY=secrets.token_hex(32),
         SESSION_COOKIE_NAME=f"{slug}_form",
         SESSION_COOKIE_HTTPONLY=True,
@@ -288,4 +290,17 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
             abort(403)
         return save_id
 
-    return current_save, protect_payload, game_lock, accepted_neighbors
+    def deliver_neighbor_pieces(relative_path, save, disk_subdir):
+        account = current_account()
+        if account is None:
+            return
+        try:
+            deliver_native_pieces(
+                connect, account["username"], save, relative_path, data_dir / disk_subdir, theme,
+                persistent=bool(durable.DATABASE_URL),
+            )
+        except Exception as error:
+            # A temporary storage failure must leave the game playable and the claim queued.
+            app.logger.warning("Neighbor piece delivery deferred: %s", type(error).__name__)
+
+    return current_save, protect_payload, game_lock, accepted_neighbors, deliver_neighbor_pieces

@@ -23,7 +23,7 @@ from get_game_config import get_game_config
 
 print (" [+] Loading players...")
 from get_player_info import get_player_info, get_neighbor_info
-from sessions import load_saves, load_static_villages, load_quests, all_saves_userid, save_info, new_village, fb_friends_str
+from sessions import load_saves, load_static_villages, load_quests, all_saves_userid, save_info, new_village, fb_friends_str, session as village_session
 load_saves()
 print (" [+] Loading static villages...")
 load_static_villages()
@@ -62,7 +62,8 @@ __DYNAMIC_ROOT = "/dynamic/menvswomen/srvsexwars"
 
 ## PAGES AND RESOURCES
 
-current_save, protect_payload, game_lock, accepted_neighbors = install_accounts(
+(current_save, protect_payload, game_lock, accepted_neighbors,
+ deliver_neighbor_pieces) = install_accounts(
     app, data_dir=DATA_DIR, slug="social-wars", title="Social Wars", theme="wars",
     play="/play.html", create_save=lambda username: new_village(), save_exists=lambda value: value in all_saves_userid(),
 )
@@ -96,6 +97,7 @@ def play():
         public_url = PUBLIC_URL or request.url_root.rstrip("/")
         if not PUBLIC_URL and app.config["SESSION_COOKIE_SECURE"]:
             public_url = public_url.replace("http://", "https://", 1)
+        deliver_neighbor_pieces(f"{user_id}.save.json", village_session(user_id), "saves")
         return render_template(
             "play.html", save_info=save_info(user_id), serverTime=timestamp_now(),
             friendsInfo=fb_friends_str(user_id, accepted_neighbors()), version=version_name,
