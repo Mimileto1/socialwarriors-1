@@ -181,7 +181,7 @@ def neighbor_session(USERID: str) -> dict:
     if USERID in __villages:
         return __villages[USERID]
 
-def fb_friends_str(USERID: str) -> list:
+def fb_friends_str(USERID: str, accepted=None) -> list:
     friends = []
     # static villages
     for key in __villages:
@@ -193,18 +193,19 @@ def fb_friends_str(USERID: str) -> list:
         frie["uid"] = vill["playerInfo"]["pid"]
         frie["pic_square"] = vill["playerInfo"]["pic"]
         friends += [frie]
-    # other players
-    for key in __saves:
-        vill = __saves[key]
-        if vill["playerInfo"]["pid"] == USERID:
+    # Show real players only after both accounts become neighbors.
+    for key, username in (accepted or {}).items():
+        vill = __saves.get(key)
+        if vill is None or key == USERID:
             continue
         frie = {}
         frie["uid"] = vill["playerInfo"]["pid"]
+        frie["first_name"] = username
         frie["pic_square"] = vill["playerInfo"]["pic"]
         friends += [frie]
     return friends
 
-def neighbors(USERID: str):
+def neighbors(USERID: str, neighbor_ids=()):
     neighbors = []
     # static villages
     for key in __villages:
@@ -221,10 +222,10 @@ def neighbors(USERID: str):
         neigh["oil"] = vill["maps"][0]["oil"]
         neigh["steel"] = vill["maps"][0]["steel"]
         neighbors += [neigh]
-    # other players
-    for key in __saves:
-        vill = __saves[key]
-        if vill["playerInfo"]["pid"] == USERID:
+    # Show real players only after both accounts become neighbors.
+    for key in neighbor_ids:
+        vill = __saves.get(key)
+        if vill is None or key == USERID:
             continue
         neigh = json.loads(json.dumps(vill["playerInfo"])) # Stop clogging up playerInfo when just wanting to send some data from save from a neighbour
         neigh["xp"] = vill["maps"][0]["xp"]

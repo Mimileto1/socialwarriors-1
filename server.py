@@ -62,7 +62,7 @@ __DYNAMIC_ROOT = "/dynamic/menvswomen/srvsexwars"
 
 ## PAGES AND RESOURCES
 
-current_save, protect_payload, game_lock = install_accounts(
+current_save, protect_payload, game_lock, accepted_neighbors = install_accounts(
     app, data_dir=DATA_DIR, slug="social-wars", title="Social Wars", theme="wars",
     play="/play.html", create_save=lambda username: new_village(), save_exists=lambda value: value in all_saves_userid(),
 )
@@ -98,7 +98,7 @@ def play():
             public_url = public_url.replace("http://", "https://", 1)
         return render_template(
             "play.html", save_info=save_info(user_id), serverTime=timestamp_now(),
-            friendsInfo=fb_friends_str(user_id), version=version_name,
+            friendsInfo=fb_friends_str(user_id, accepted_neighbors()), version=version_name,
             GAMEVERSION="Basesec_1.5.4.swf", public_url=public_url,
         )
 
@@ -166,10 +166,13 @@ def get_player_info_response():
 
     # print(f"get_player_info: USERID: {USERID}. --")
 
+    if user is not None and user != USERID and user in all_saves_userid() and user not in accepted_neighbors():
+        return ("", 200)
+
     # Current Player
     if user is None:
         print(f"[PLAYER INFO] USERID {USERID}.")
-        return (get_player_info(USERID), 200)
+        return (get_player_info(USERID, accepted_neighbors()), 200)
     # General Mike
     elif user in ["100000030","100000031"]:
         print(f"[VISIT] USERID {USERID} visiting General Mike ({user}).")

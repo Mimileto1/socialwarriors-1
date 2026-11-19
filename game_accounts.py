@@ -110,6 +110,27 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
         account = current_account()
         return account["save_id"] if account else None
 
+    def accepted_neighbors():
+        """Map the current account's accepted neighbors to their game save IDs."""
+        if "accepted_neighbors" not in g:
+            account = current_account()
+            if account is None:
+                return {}
+            username = account["username"]
+            with connect() as db:
+                rows = db.execute(
+                    """SELECT a.save_id, a.username FROM friendships f
+                       JOIN accounts a ON a.username=f.second
+                       WHERE f.first=? AND f.accepted=1
+                       UNION ALL
+                       SELECT a.save_id, a.username FROM friendships f
+                       JOIN accounts a ON a.username=f.first
+                       WHERE f.second=? AND f.accepted=1
+                       ORDER BY username""", (username, username),
+                ).fetchall()
+            g.accepted_neighbors = {str(row["save_id"]): row["username"] for row in rows}
+        return g.accepted_neighbors
+
     def csrf_token():
         if "csrf" not in session:
             session["csrf"] = secrets.token_urlsafe(32)
@@ -267,4 +288,4 @@ def install_accounts(app, *, data_dir, slug, title, theme, play, create_save, sa
             abort(403)
         return save_id
 
-    return current_save, protect_payload, game_lock
+    return current_save, protect_payload, game_lock, accepted_neighbors
