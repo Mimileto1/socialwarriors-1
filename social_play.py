@@ -1,9 +1,9 @@
 """Authenticated chat and friendship requests for one game."""
 import time
-import uuid
 from collections import defaultdict, deque
 from threading import Lock
 
+from community_http import chat_id, conditional_json
 from community_tools import install_community_tools
 
 from flask import abort, jsonify, render_template, request
@@ -71,8 +71,8 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
             if not 1 <= len(message) <= 300:
                 return jsonify(error="Escribe un mensaje de 1 a 300 caracteres."), 400
             with connect() as db:
-                db.execute("INSERT INTO chat_messages VALUES (?, ?, ?, ?)",
-                           (uuid.uuid4().hex, username, message, time.time_ns() // 1_000_000))
+                db.execute("INSERT INTO chat_messages VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                           (chat_id(username, "global"), username, message, time.time_ns() // 1_000_000))
             return jsonify(ok=True), 201
         with connect() as db:
             rows = db.execute(
@@ -80,7 +80,7 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
                    WHERE NOT EXISTS (SELECT 1 FROM hidden_chat_messages h WHERE h.message_id=m.id)
                    ORDER BY m.created DESC, m.id DESC LIMIT 50"""
             ).fetchall()
-        return jsonify(messages=[dict(row) for row in reversed(rows)])
+        return conditional_json(messages=[dict(row) for row in reversed(rows)])
 
     @app.get("/social/players")
     def social_players():
@@ -127,14 +127,14 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
                 message = request.form.get("message", "").strip()
                 if not 1 <= len(message) <= 300:
                     return jsonify(error="Escribe un mensaje de 1 a 300 caracteres."), 400
-                db.execute("INSERT INTO private_messages VALUES (?, ?, ?, ?, ?, ?)",
-                           (uuid.uuid4().hex, first, second, username, message, time.time_ns() // 1_000_000))
+                db.execute("INSERT INTO private_messages VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                           (chat_id(username, f"private:{first}:{second}"), first, second, username, message, time.time_ns() // 1_000_000))
                 return jsonify(ok=True), 201
             rows = db.execute(
                 """SELECT author, body, created FROM private_messages WHERE first=? AND second=?
                    ORDER BY created DESC, id DESC LIMIT 50""", (first, second)
             ).fetchall()
-        return jsonify(messages=[dict(row) for row in reversed(rows)])
+        return conditional_json(messages=[dict(row) for row in reversed(rows)])
 
     @app.route("/social/friends", methods=["GET", "POST"])
     def social_friends():
@@ -145,7 +145,7 @@ def install_social(app, connect, current_account, verify_csrf, username_pattern,
                     """SELECT first, second, sender, accepted FROM friendships
                        WHERE first=? OR second=? ORDER BY first, second""", (username, username)
                 ).fetchall()
-            return jsonify(friends=[
+            return conditional_json(friends=[
                 {"username": row["second"] if row["first"] == username else row["first"],
                  "status": "accepted" if row["accepted"] else "outgoing" if row["sender"] == username else "incoming"}
                 for row in rows

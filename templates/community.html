@@ -1,19 +1,23 @@
 <aside class="game-community game-community-{{ community_theme }}" aria-label="Comunidad del juego">
   <nav aria-label="Comunidad">
-    <button type="button" data-panel="chat" aria-expanded="false"><span aria-hidden="true">◈</span>Chat</button>
+    <button type="button" data-panel="chat" aria-expanded="false"><span aria-hidden="true">☵</span>Chat</button>
     <button type="button" data-panel="neighbors" aria-expanded="false"><span aria-hidden="true">♟</span>Vecinos</button>
     <button type="button" data-panel="invite" aria-expanded="false"><span aria-hidden="true">✉</span>Invitar</button>
     <button type="button" data-panel="alliance" aria-expanded="false"><span aria-hidden="true">⚑</span>Alianza</button>
     <button type="button" data-panel="events" aria-expanded="false"><span aria-hidden="true">✦</span>Eventos</button>
-    <button type="button" data-panel="ranking" aria-expanded="false"><span aria-hidden="true">◆</span>Clasif.</button>
+    <button type="button" data-panel="ranking" aria-expanded="false"><span aria-hidden="true">▥</span>Clasif.</button>
     <button type="button" data-panel="rewards" aria-expanded="false"><span aria-hidden="true">✿</span>Bonos</button>
     <button type="button" data-panel="profile" aria-expanded="false"><span aria-hidden="true">◉</span>Perfil</button>
     {% if community_is_admin() %}<a href="/admin"><span aria-hidden="true">⚙</span>Admin</a>{% endif %}
   </nav>
-  <div class="community-drawer" id="community-drawer" hidden>
-    <header><h2 id="community-heading"></h2><button type="button" id="community-close" aria-label="Cerrar panel">×</button></header>
+  <div class="community-drawer" id="community-drawer" role="region" aria-labelledby="community-heading" hidden>
+    <header>
+      <div><h2 id="community-heading"></h2><p class="community-connection" id="community-connection" role="status"></p></div>
+      <button type="button" id="community-retry" hidden>Reintentar</button>
+      <button type="button" id="community-close" aria-label="Cerrar panel">×</button>
+    </header>
   <section data-view="chat" aria-label="Chat en vivo">
-    <p><strong id="community-room">Sala global</strong> <button type="button" id="community-global" hidden>Volver al chat global</button></p>
+    <p id="community-room-row"><strong id="community-room">Sala global</strong> <button type="button" id="community-global" hidden>Volver al chat global</button></p>
     <ol id="community-messages" aria-label="Mensajes del chat"></ol>
     <form id="community-chat">
       <label for="community-message">Mensaje</label>
@@ -25,9 +29,10 @@
     <ul id="community-friends"></ul>
   </section>
   <section data-view="invite" aria-label="Invitaciones" hidden>
-    <label for="community-link">Tu enlace de invitación</label>
-    <input id="community-link" readonly>
-    <button type="button" id="community-copy">Copiar enlace</button>
+    <div id="community-invite-link">
+      <label for="community-link">Tu enlace de invitación</label>
+      <div><input id="community-link" readonly><button type="button" id="community-copy">Copiar enlace</button></div>
+    </div>
     <form id="community-search">
       <label for="community-query">Buscar jugador</label>
       <input id="community-query" name="q" minlength="2" maxlength="32" required>
@@ -68,34 +73,108 @@
   </div>
 </aside>
 <style>
-.game-community{--panel:#18231d;--border:#7c9353;--accent:#d7e4a8;--ink:#f3f5e7;--control:#334438;
-position:fixed;z-index:6000;left:0;top:clamp(4.5rem,15vh,9rem);display:flex;align-items:flex-start;isolation:isolate;
-color:var(--ink);font:14px system-ui,sans-serif;text-align:left;max-width:100vw}
-.game-community-empires{--panel:#2c1e20;--border:#a77846;--accent:#ffd598;--ink:#f6e8d6;--control:#4d3229}
-.game-community-city{--panel:#112a42;--border:#3c92ad;--accent:#a7edf9;--ink:#edf8ff;--control:#1e435e}
-.game-community [hidden]{display:none!important}
-.game-community nav{display:grid;gap:3px;width:4.45rem;max-height:76vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-left:0;border-radius:0 12px 12px 0;padding:5px;box-shadow:0 8px 25px #0006;box-sizing:border-box}
-.game-community nav :is(button,a){display:grid;justify-items:center;text-decoration:none;font-size:.72rem;line-height:1.15;color:var(--ink);padding:6px 2px;background:none;border:1px solid transparent;border-radius:6px}
-.game-community nav span{color:var(--accent);font-size:1.25rem;line-height:1.2}
-.game-community nav :is(button,a):hover,.game-community nav [aria-expanded=true]{border-color:var(--border);background:var(--control)}
-.community-drawer{box-sizing:border-box;margin-left:.4rem;width:min(22rem,calc(100vw - 5.3rem));max-height:76vh;overflow:auto;
-background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0 14px 14px;box-shadow:0 12px 35px #0008;color:var(--ink)}
-.community-drawer header{position:sticky;top:0;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);margin-bottom:12px;padding:9px 0;z-index:1}
-.community-drawer h2{font-size:1.05rem;margin:0;color:var(--accent)}
-.game-community button{cursor:pointer;color:var(--ink);font:inherit;background:var(--control);border:1px solid var(--border);border-radius:6px;padding:5px 8px}
-.game-community :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.game-community ol,.game-community ul{margin:0;padding:0;list-style:none;overflow-wrap:anywhere}
-.game-community ol{max-height:12rem;overflow:auto}.game-community li{margin:6px 0}
-.game-community form{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
-.game-community label{flex-basis:100%}
-.game-community input{box-sizing:border-box;min-width:0;flex:1;background:var(--ink);color:var(--panel);border:0;border-radius:4px;padding:6px}
-.game-community dt{font-weight:700}.game-community dd{margin:0 0 8px}
-#community-status:empty{display:none}
-@media(max-width:540px){.game-community{top:auto;bottom:10px}.game-community nav,.community-drawer{max-height:64vh}}
+.game-community {
+  --panel:#18231c; --raised:#26392c; --line:#5c7651; --accent:#d9eca2;
+  --ink:#f5f8ee; --muted:#bfcebe; --surface:#121d17; --accent-ink:#162411;
+  position:fixed; z-index:6000; inset:clamp(4rem,12vh,8rem) auto auto 0;
+  display:flex; align-items:flex-start; max-width:100%; isolation:isolate;
+  font:14px/1.45 system-ui,sans-serif; color:var(--ink); text-align:left;
+}
+.game-community-empires {
+  --panel:#261a24; --raised:#432a35; --line:#a07056; --accent:#ffd295;
+  --ink:#fff2e5; --muted:#e3c5b9; --surface:#1b121a; --accent-ink:#321c24;
+}
+.game-community-city {
+  --panel:#102639; --raised:#1b3a50; --line:#397e93; --accent:#9aeafb;
+  --ink:#edf9ff; --muted:#bed7e4; --surface:#0b1d2d; --accent-ink:#102839;
+}
+.game-community *, .game-community *::before { box-sizing:border-box }
+.game-community [hidden] { display:none!important }
+.game-community nav {
+  display:grid; gap:4px; width:4.75rem; max-height:80vh; overflow:auto; overscroll-behavior:contain;
+  padding:6px 5px; background:linear-gradient(165deg,var(--raised),var(--panel) 36%);
+  border:1px solid var(--line); border-left:0; border-radius:0 16px 16px 0;
+  box-shadow:0 10px 28px #0007;
+}
+.game-community nav :is(button,a) {
+  position:relative; display:grid; justify-items:center; gap:2px; min-height:2.65rem;
+  text-decoration:none; font-size:.73rem; font-weight:650; line-height:1.15;
+  color:var(--muted); padding:4px 1px; background:none; border:1px solid transparent; border-radius:8px;
+}
+.game-community nav span { color:var(--accent); font-size:1.16rem; line-height:1 }
+.game-community nav :is(button,a):hover { color:var(--ink); background:var(--raised) }
+.game-community nav [aria-expanded=true] { color:var(--accent); border-color:var(--line); background:var(--raised) }
+.game-community nav [aria-expanded=true]::before {
+  content:""; position:absolute; inset:7px auto 7px 0; width:3px;
+  border-radius:1px 4px 4px 1px; background:var(--accent);
+}
+.community-drawer {
+  margin-left:.5rem; width:min(25rem,calc(100vw - 5.6rem)); max-height:80vh; overflow:auto;
+  background:var(--panel); border:1px solid var(--line); border-top:2px solid var(--accent);
+  border-radius:14px; padding:0 16px 16px; box-shadow:0 16px 40px #0009; overscroll-behavior:contain;
+}
+.community-drawer header {
+  position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin:0 -16px 12px; padding:12px 16px; border-bottom:1px solid var(--line);
+  background:linear-gradient(120deg,var(--raised),var(--panel));
+}
+.community-drawer h2 { font-size:1.17rem; line-height:1.25; margin:0; color:var(--ink) }
+.community-drawer h3 { font-size:.94rem; color:var(--accent); margin:1.05em 0 .55em }
+.community-connection { display:flex; align-items:center; gap:6px; margin:.25rem 0 0; font-size:.75rem; color:var(--muted) }
+.community-connection::before { content:""; width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:#e9b96d }
+.community-connection[data-state="online"]::before { background:#a9e49a }
+.community-connection[data-state="offline"]::before,.community-connection[data-state="expired"]::before { background:#f09894 }
+.community-drawer header > button { min-width:36px; font-size:1.25rem; line-height:1 }
+.game-community button {
+  border:1px solid var(--line); cursor:pointer; color:var(--ink); font:inherit; font-weight:550;
+  background:var(--raised); border-radius:7px; padding:6px 9px; line-height:1.2;
+}
+.game-community button:hover:enabled { border-color:var(--accent) }
+.game-community button:disabled { color:var(--muted); cursor:default; opacity:.62 }
+.game-community form > button:is(:not([type]),[type="submit"]) { background:var(--accent); color:var(--accent-ink) }
+.game-community :focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.game-community :is(ol,ul) { margin:0; padding:0; list-style:none; overflow-wrap:anywhere }
+.game-community li { margin:6px 0; padding:7px 9px; background:var(--surface); border:1px solid transparent; border-radius:8px }
+.game-community li button { margin:3px 2px 0 }
+.game-community form { display:flex; align-items:end; gap:7px; flex-wrap:wrap; margin:10px 0 }
+.game-community label { flex-basis:100%; color:var(--muted); font-size:.82rem; font-weight:650 }
+.game-community input {
+  box-sizing:border-box; min-width:0; min-height:35px; flex:1; background:var(--surface);
+  color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 8px; font:inherit;
+}
+#community-invite-link { display:grid; gap:5px }
+#community-invite-link > div { display:flex; gap:7px }
+#community-room-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:5px; margin:0 0 9px }
+#community-room { overflow-wrap:anywhere; color:var(--accent) }
+#community-messages { max-height:min(43vh,19rem); min-height:3.2rem; overflow:auto; overscroll-behavior:contain }
+#community-messages li { margin:0 0 5px }
+#community-messages li[data-own] { background:var(--raised); border-color:var(--line) }
+#community-messages li p { margin:1px 0 0; white-space:pre-wrap }
+#community-messages .message-meta { display:flex; justify-content:space-between; gap:8px; color:var(--accent); font-size:.79rem }
+#community-messages time { color:var(--muted); white-space:nowrap }
+#community-status { padding:8px 9px; border-left:2px solid var(--accent); background:var(--surface); border-radius:5px; margin:10px 0 0 }
+#community-status:empty { display:none }
+#community-points { color:var(--accent); background:var(--surface); padding:10px; border:1px solid var(--line); border-radius:8px }
+#community-profile { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; margin:0; overflow-wrap:anywhere }
+#community-profile dt { color:var(--muted) }
+#community-profile dd { margin:0; font-weight:650 }
+@media (max-width:600px) {
+  .game-community { inset:auto 0 0; flex-direction:column-reverse; align-items:stretch; }
+  .game-community nav {
+    grid-auto-flow:column; grid-auto-columns:minmax(3.8rem,1fr); width:100%; max-height:none;
+    overflow:auto; border:1px solid var(--line); border-bottom:0; border-radius:12px 12px 0 0;
+    padding-bottom:max(6px,env(safe-area-inset-bottom));
+  }
+  .game-community nav :is(button,a) { min-height:41px; }
+  .community-drawer { width:auto; margin:0 5px 6px; max-height:64vh; max-height:64dvh; }
+  .game-community nav [aria-expanded=true]::before { inset:auto 8px 0; width:auto; height:2px }
+}
 </style>
 <script>
 (() => {
   const token = {{ account_csrf() | tojson }};
+  const username = {{ community_username() | tojson }};
+  const chatTime = new Intl.DateTimeFormat("es", {hour:"2-digit", minute:"2-digit"});
   const messages = document.querySelector("#community-messages");
   const friends = document.querySelector("#community-friends");
   const status = document.querySelector("#community-status");
@@ -114,23 +193,78 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
   const tabs = panel.querySelectorAll("[data-panel]");
   let lastChat = "";
   let lastFriends = "";
-  let polling = false;
   let stopped = false;
-  async function api(path, fields) {
-    const options = fields ? {method: "POST", body: new URLSearchParams({...fields, csrf: token})} : {};
-    const response = await fetch("/social/" + path, options);
-    if (response.status === 401) {
-      stopped = true;
-      throw new Error("Inicia sesión de nuevo para usar la comunidad.");
+  let pollTimer;
+  let pollRequest;
+  let pollKey = "";
+  let pollTag = "";
+  let failures = 0;
+  let viewRevision = 0;
+  let pendingChat;
+  const connection = document.querySelector("#community-connection");
+  const retry = document.querySelector("#community-retry");
+  const connectionLabels = {
+    connecting: "Conectando…", online: "Conectado",
+    retrying: "Reconectando…", offline: "Sin conexión", expired: "Sesión vencida"
+  };
+  function connectionState(state) {
+    if (connection.dataset.state === state) return;
+    connection.dataset.state = state;
+    connection.textContent = connectionLabels[state];
+    retry.hidden = state !== "retrying";
+  }
+
+  async function api(path, fields, check = {}) {
+    if (!navigator.onLine) {
+      connectionState("offline");
+      throw new Error("Estás sin conexión. Vuelve a intentarlo al recuperar la red.");
     }
-    if (response.status === 429) throw new Error("Espera unos segundos antes de volver a enviar.");
-    if (response.status === 403 && !response.headers.get("Content-Type")?.includes("json")) throw new Error("Recarga la página y vuelve a intentar.");
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "La comunidad no está disponible.");
-    return data;
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    if (check.signal?.aborted) cancel();
+    check.signal?.addEventListener("abort", cancel, {once:true});
+    const timeout = setTimeout(cancel, 10000);
+    const headers = check.etag ? {"If-None-Match":check.etag} : {};
+    const options = fields
+      ? {method:"POST", body:new URLSearchParams({...fields, csrf:token}), headers}
+      : {headers};
+    try {
+      const response = await fetch("/social/" + path, {...options, signal:controller.signal, cache:"no-store"});
+      if (response.status === 401) {
+        stopped = true;
+        connectionState("expired");
+        throw new Error("Inicia sesión de nuevo para usar la comunidad.");
+      }
+      if (response.status >= 500) {
+        connectionState("retrying");
+        throw new Error("La comunidad está tardando en responder. Inténtalo de nuevo.");
+      }
+      connectionState("online");
+      if (response.status === 304 && check.conditional) return {etag:check.etag};
+      if (response.status === 429) throw new Error("Espera unos segundos antes de volver a enviar.");
+      const isJson = response.headers.get("Content-Type")?.includes("json");
+      if (response.status === 403 && !isJson) throw new Error("Recarga la página y vuelve a intentar.");
+      if (!isJson) throw new Error("No se pudo completar la consulta.");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "La comunidad no está disponible.");
+      return check.conditional ? {data, etag:response.headers.get("ETag") || ""} : data;
+    } catch (error) {
+      if (check.signal?.aborted) throw error;
+      if (error.name === "AbortError" || error instanceof TypeError) {
+        connectionState(navigator.onLine ? "retrying" : "offline");
+        throw new Error("Se perdió la conexión. Inténtalo de nuevo.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      check.signal?.removeEventListener("abort", cancel);
+    }
   }
   async function activate(view) {
+    const revision = ++viewRevision;
     activeView = view;
+    if (view) connectionState(stopped ? "expired" : navigator.onLine ? "connecting" : "offline");
+    refresh();
     drawer.hidden = !view;
     heading.textContent = views[view] || "";
     for (const tab of tabs) {
@@ -138,9 +272,12 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
       tab.setAttribute("aria-controls", "community-drawer");
     }
     for (const section of panel.querySelectorAll("[data-view]")) section.hidden = section.dataset.view !== view;
-    if (view === "invite" && !link.value) {
-      try { link.value = new URL((await api("invitation")).path, location.origin).href; }
-      catch (error) { status.textContent = error.message; }
+    if (view === "invite") {
+      try {
+        const invitation = await api("invitation");
+        if (revision === viewRevision) link.value = new URL(invitation.path, location.origin).href;
+      }
+      catch (error) { if (revision === viewRevision) status.textContent = error.message; }
     }
     try {
       if (view === "alliance") await loadAlliance();
@@ -149,6 +286,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
       if (view === "rewards") await loadRewards();
       if (view === "profile") {
         const player = await api("profile");
+        if (revision !== viewRevision) return;
         const fields = [["Usuario", player.username], ["Título", player.title || "Sin título"], ["Vecinos", player.neighbors], ["Alianza", player.alliance || "Sin alianza"]];
         const profile = document.querySelector("#community-profile");
         profile.replaceChildren(...fields.flatMap(([label, value]) => {
@@ -158,8 +296,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
           return [title, detail];
         }));
       }
-    } catch (error) { status.textContent = error.message; }
-    refresh();
+    } catch (error) { if (revision === viewRevision) status.textContent = error.message; }
   }
   let rankingEvent = "";
   const dateLabel = new Intl.DateTimeFormat("es-CO", {dateStyle:"medium", timeStyle:"short", timeZone:"America/Bogota"});
@@ -270,8 +407,8 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     globalButton.hidden = !peer && !alliance;
     messages.replaceChildren();
     lastChat = "";
+    pollTag = "";
     activate("chat");
-    refresh();
   }
   tabs.forEach(tab => tab.addEventListener("click", () => {
     activeButton = tab;
@@ -388,19 +525,36 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     lastChat = signature;
     const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 30;
     const oldTop = messages.scrollTop;
-    messages.replaceChildren(...rows.map(({author, body}) => {
+    messages.replaceChildren(...rows.map(({author, body, created}) => {
       const item = document.createElement("li");
+      if (author === username) item.dataset.own = "";
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
       const name = document.createElement("strong");
-      name.textContent = author + ": ";
-      item.append(name, body);
+      name.textContent = author === username ? "Tú" : author;
+      const time = document.createElement("time");
+      const timestamp = new Date(created);
+      if (Number.isFinite(timestamp.getTime())) {
+        time.dateTime = timestamp.toISOString();
+        time.textContent = chatTime.format(timestamp);
+      }
+      meta.append(name, time);
+      const text = document.createElement("p");
+      text.textContent = body;
+      item.append(meta, text);
       return item;
     }));
+    if (!rows.length) messages.append(Object.assign(document.createElement("li"), {textContent:"Aún no hay mensajes en esta sala."}));
     messages.scrollTop = atEnd ? messages.scrollHeight : oldTop;
   }
   function renderFriends(rows) {
     const signature = JSON.stringify(rows);
     if (signature === lastFriends) return;
     lastFriends = signature;
+    if (!rows.length) {
+      friends.replaceChildren(Object.assign(document.createElement("li"), {textContent:"Aún no tienes vecinos. Puedes buscarlos en Invitar."}));
+      return;
+    }
     friends.replaceChildren(...rows.map(({username, status: state}) => {
       const item = document.createElement("li");
       item.append(username + (state === "outgoing" ? " · Enviada " : state === "incoming" ? " · Recibida " : " "));
@@ -421,38 +575,80 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
       return item;
     }));
   }
-  async function refresh() {
-    if (polling || stopped || document.hidden || !["chat", "neighbors"].includes(activeView)) return;
-    polling = true;
+  function canPoll() {
+    return !stopped && !document.hidden && navigator.onLine && ["chat", "neighbors"].includes(activeView);
+  }
+  function pausePolling() {
+    clearTimeout(pollTimer);
+    pollRequest?.abort();
+    pollRequest = null;
+  }
+  function refresh() {
+    pausePolling();
+    if (canPoll()) pollTimer = setTimeout(poll, 0);
+  }
+  async function poll() {
+    if (!canPoll()) return;
+    const view = activeView;
+    const key = view === "chat" ? chatPath() : "friends";
+    if (key !== pollKey) {
+      failures = 0;
+      pollKey = key;
+      pollTag = "";
+    }
+    const request = new AbortController();
+    pollRequest = request;
     try {
-      const view = activeView;
-      if (view === "chat") {
-        const path = chatPath();
-        const chat = await api(path);
-        if (activeView === view && path === chatPath()) renderChat(chat.messages);
-      } else {
-        const list = await api("friends");
-        if (activeView === view) renderFriends(list.friends);
+      const result = await api(key, undefined, {conditional:true, etag:pollTag, signal:request.signal});
+      if (pollRequest !== request) return;
+      failures = 0;
+      pollTag = result.etag;
+      if (result.data) {
+        if (view === "chat") renderChat(result.data.messages);
+        else renderFriends(result.data.friends);
       }
     } catch (error) {
-      status.textContent = error.message;
+      if (pollRequest === request) {
+        failures++;
+        if (stopped || connection.dataset.state === "online") status.textContent = error.message;
+      }
     } finally {
-      polling = false;
+      if (pollRequest === request) {
+        pollRequest = null;
+        const base = view === "chat" ? 6000 : 16000;
+        const delay = Math.min(60000, base * 2 ** Math.min(failures, 4));
+        if (canPoll()) pollTimer = setTimeout(poll, delay + Math.random() * 600);
+      }
     }
   }
   async function submit(path, fields, form) {
+    const button = form?.querySelector("button");
+    if (button?.disabled) return false;
+    if (button) button.disabled = true;
     try {
       await api(path, fields);
-      if (form) form.reset();
+      if (form && (!fields.message || form.elements.message.value === fields.message)) form.reset();
       status.textContent = "";
-      await refresh();
+      refresh();
+      return true;
     } catch (error) {
       status.textContent = error.message;
+      return false;
+    } finally {
+      if (button) button.disabled = false;
     }
   }
-  document.querySelector("#community-chat").addEventListener("submit", event => {
+  document.querySelector("#community-chat").addEventListener("submit", async event => {
     event.preventDefault();
-    submit(chatPath(), {message: event.currentTarget.elements.message.value}, event.currentTarget);
+    const form = event.currentTarget;
+    if (form.querySelector("button").disabled) return;
+    const text = form.elements.message.value;
+    const room = chatPath();
+    if (pendingChat?.text !== text || pendingChat.room !== room) {
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, "0")).join("");
+      pendingChat = {text, room, id};
+    }
+    if (await submit(room, {message:text, message_id:pendingChat.id}, form)) pendingChat = undefined;
   });
   document.querySelector("#community-search").addEventListener("submit", async event => {
     event.preventDefault();
@@ -488,8 +684,18 @@ background:var(--panel);border:1px solid var(--border);border-radius:12px;paddin
     event.preventDefault();
     submit("friends", {action: "request", username: event.currentTarget.elements.username.value}, event.currentTarget);
   });
+  retry.addEventListener("click", () => activate(activeView));
   document.addEventListener("visibilitychange", refresh);
+  window.addEventListener("offline", () => {
+    pausePolling();
+    if (!stopped) connectionState("offline");
+  });
+  window.addEventListener("online", () => {
+    if (activeView && !stopped) {
+      failures = 0;
+      activate(activeView);
+    }
+  });
   refresh();
-  setInterval(refresh, 5000);
 })();
 </script>

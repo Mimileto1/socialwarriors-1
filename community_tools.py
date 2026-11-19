@@ -4,6 +4,7 @@ import re
 import time
 import uuid
 
+from community_http import chat_id, conditional_json
 from community_activities import install_activities
 from flask import abort, jsonify, redirect, render_template, request
 
@@ -52,6 +53,12 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
         return bool(account and account["username"] in admins)
 
     app.jinja_env.globals["community_is_admin"] = is_admin
+
+    def community_username():
+        account = current_account()
+        return account["username"] if account else ""
+
+    app.jinja_env.globals["community_username"] = community_username
 
     def username():
         account = current_account()
@@ -201,8 +208,8 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                 return jsonify(error="El chat de alianza requiere una membresía activa."), 403
             group = member["alliance_id"]
             if posting:
-                db.execute("INSERT INTO alliance_messages VALUES (?, ?, ?, ?, ?)",
-                           (uuid.uuid4().hex, group, player, message, time.time_ns() // 1_000_000))
+                db.execute("INSERT INTO alliance_messages VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                           (chat_id(player, f"alliance:{group}"), group, player, message, time.time_ns() // 1_000_000))
                 return jsonify(ok=True), 201
             rows = db.execute(
                 """SELECT m.author, m.body, m.created FROM alliance_messages m
@@ -210,7 +217,7 @@ def install_community_tools(app, connect, current_account, verify_csrf, persiste
                    WHERE a.username=? AND m.alliance_id=?
                    ORDER BY m.created DESC, m.id DESC LIMIT 50""", (player, group)
             ).fetchall()
-        return jsonify(messages=[dict(row) for row in reversed(rows)])
+        return conditional_json(messages=[dict(row) for row in reversed(rows)])
 
     @app.get("/social/profile")
     def social_profile():
